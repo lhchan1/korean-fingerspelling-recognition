@@ -1,0 +1,39 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# 원본 영상
+dataset/S001/
+dataset/rejected/
+*.mp4
+*.mov
+*.avi
+
+# 백업
+backups/
+
+# 임시 특징
+features_part1/
+features_part2/
+features_part3/
+
+# 이전 모델
+training/lstm_v1/
+training/lstm_v2/
+training/lstm_v3/
+training/lstm_v4/
+training/lstm_v5/
+
+# IDE
+.idea/
+.vscode/
+
+# 임시 파일
+*.log
+*.tmp

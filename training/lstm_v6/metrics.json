@@ -1,0 +1,6 @@
+{
+  "test_loss": 0.06189301982522011,
+  "test_accuracy": 0.9677419066429138,
+  "epochs_trained": 71,
+  "warning": "Single-signer pilot result; not a signer-independent evaluation."
+}
