@@ -50,7 +50,7 @@ def parse_args() -> argparse.Namespace:
         help="이 검출률 미만 영상은 학습에서 제외 (기본 0.5)",
     )
     parser.add_argument(
-        "--output", type=Path, default=project_dir / "training" / "lstm_v6"
+        "--output", type=Path, default=project_dir / "training" / "lstm_v10_no_double"
     )
     parser.add_argument("--labels", nargs="*", default=None)
     parser.add_argument("--sequence-length", type=int, default=12)
@@ -321,7 +321,10 @@ def main() -> int:
         "test_loss": float(test_loss),
         "test_accuracy": float(test_accuracy),
         "epochs_trained": len(history.history["loss"]),
-        "warning": "Single-signer pilot result; not a signer-independent evaluation.",
+        "warning": (
+            "Random video-level split; multiple signers may appear across train/validation/test, "
+            "so this is not a signer-independent evaluation."
+        ),
     }
     (args.output / "metrics.json").write_text(
         json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8"

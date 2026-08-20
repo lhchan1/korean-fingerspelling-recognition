@@ -51,17 +51,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=Path,
-        default=project_dir / "training" / "lstm_v6" / "fingerspelling_lstm.keras",
+        default=project_dir / "training" / "lstm_v10_no_double" / "fingerspelling_lstm.keras",
     )
     parser.add_argument(
         "--config",
         type=Path,
-        default=project_dir / "training" / "lstm_v6" / "config.json",
+        default=project_dir / "training" / "lstm_v10_no_double" / "config.json",
     )
     parser.add_argument(
         "--labels",
         type=Path,
-        default=project_dir / "training" / "lstm_v6" / "labels.json",
+        default=project_dir / "training" / "lstm_v10_no_double" / "labels.json",
     )
     parser.add_argument(
         "--landmarker-model",
@@ -267,7 +267,7 @@ def main() -> int:
                 )
                 cv2.putText(
                     preview,
-                    "Q / ESC: quit | Hold one sign for about 2 seconds",
+                    "Q / ESC: quit | Perform one sign for about 3 seconds",
                     (24, preview.shape[0] - 24),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.65,
