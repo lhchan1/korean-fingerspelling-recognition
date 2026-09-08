@@ -1,0 +1,7 @@
+{
+  "test_loss": 0.0003685342089738697,
+  "test_accuracy": 1.0,
+  "test_videos": 10,
+  "epochs_trained": 180,
+  "warning": "Single-signer random video split; this is not signer-independent accuracy."
+}

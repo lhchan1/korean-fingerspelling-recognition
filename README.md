@@ -1,3 +1,5 @@
+nㄴn
+
 # 한국어 지문자 영상 수집기
 
 MacBook 웹캠으로 지문자 영상을 촬영하고 `촬영자/세션/라벨` 단위로 저장합니다.
@@ -26,8 +28,7 @@ python3 capture.py --signer S001
 python3 capture.py --signer S001 --duration 5
 ```
 
-macOS가 카메라 권한을 요청하면 허용합니다. 열리지 않을 경우 `시스템 설정 >
-개인정보 보호 및 보안 > 카메라`에서 Terminal 또는 Codex의 접근을 허용합니다.
+macOS가 카메라 권한을 요청하면 허용합니다. 열리지 않을 경우 `시스템 설정 > 개인정보 보호 및 보안 > 카메라`에서 Terminal 또는 Codex의 접근을 허용합니다.
 
 ## 키 조작
 
