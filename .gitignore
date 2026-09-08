@@ -15,6 +15,10 @@ dataset/rejected/
 *.mov
 *.avi
 
+# 팀원 촬영 기준을 맞추기 위한 클래스별 대표 영상만 허용
+!word_sign/examples/
+!word_sign/examples/**/*.mp4
+
 # 백업
 backups/
 

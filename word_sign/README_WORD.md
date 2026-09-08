@@ -33,6 +33,8 @@ word_dataset/
 
 새 촬영자는 `--signer S002`처럼 실행하면 자동으로 동일한 폴더가 만들어진다.
 
+팀원에게 촬영을 요청할 때는 [클래스별 대표 영상 및 촬영 가이드](examples/README.md)를 먼저 확인하도록 안내한다. `examples/`의 영상만 GitHub에 포함하고 `word_dataset/` 원본 영상은 업로드하지 않는다.
+
 ## 3. 양손 + Pose 특징 추출
 
 `models/pose_landmarker_lite.task`가 필요하다. 손 모델은 기존 `models/hand_landmarker.task`를 재사용한다.
