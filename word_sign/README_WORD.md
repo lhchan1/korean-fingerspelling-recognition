@@ -1,6 +1,6 @@
 # 단어 수어 데이터 수집 베이스
 
-현재 클래스는 `IDLE`, `OTHER`, `나`, `가다`, `학교`, `먹다`, `아프다` 7종이며 1280×720, 30FPS, 4초로 저장한다.
+현재 클래스는 `IDLE`, `OTHER`와 단어 10종을 합친 총 12종이며 1280×720, 30FPS, 4초로 저장한다.
 원본 분석 좌표를 보존하기 위해 저장 영상은 기본적으로 미러링하지 않는다. 화면 미리보기만 거울 모드다.
 
 ## 1. 촬영
@@ -28,12 +28,62 @@ word_dataset/
     ├── 03_가다/
     ├── 04_학교/
     ├── 05_먹다/
-    └── 06_아프다/
+    ├── 06_아프다/
+    ├── 07_너/
+    ├── 08_좋다/
+    ├── 09_싫다/
+    ├── 10_마시다/
+    └── 11_집/
 ```
 
 새 촬영자는 `--signer S002`처럼 실행하면 자동으로 동일한 폴더가 만들어진다.
 
 팀원에게 촬영을 요청할 때는 [클래스별 대표 영상 및 촬영 가이드](examples/README.md)를 먼저 확인하도록 안내한다. `examples/`의 영상만 GitHub에 포함하고 `word_dataset/` 원본 영상은 업로드하지 않는다.
+
+### S001 대표 영상 GitHub 공유
+
+`word_dataset/S001/`의 원본 전체를 GitHub에 올리지 않고, 각 클래스에서 검수한 영상 1개만 `examples/`에 복사해 공유한다. 현재 대표 영상은 `00_IDLE`부터 `11_집`까지 총 12개다.
+
+```text
+word_sign/examples/
+├── 00_IDLE/example_00_IDLE.mp4
+├── 01_OTHER/example_01_OTHER.mp4
+├── 02_나/example_02_나.mp4
+├── 03_가다/example_03_가다.mp4
+├── 04_학교/example_04_학교.mp4
+├── 05_먹다/example_05_먹다.mp4
+├── 06_아프다/example_06_아프다.mp4
+├── 07_너/example_07_너.mp4
+├── 08_좋다/example_08_좋다.mp4
+├── 09_싫다/example_09_싫다.mp4
+├── 10_마시다/example_10_마시다.mp4
+└── 11_집/example_11_집.mp4
+```
+
+대표 영상을 바꿀 때는 S001의 해당 클래스에서 올바르게 촬영된 영상 하나를 선택해 위 이름으로 교체한다. 원본 영상 파일을 이동하거나 이름을 변경하지 않는다.
+
+GitHub에 올리기 전에는 다음 명령으로 스테이징 대상 영상이 `examples/`의 12개뿐인지 확인한다.
+
+```bash
+git add .gitignore \
+  word_sign/README_WORD.md \
+  word_sign/examples/README.md \
+  word_sign/examples \
+  word_sign/word_labels.txt \
+  word_sign/capture_words.py \
+  word_sign/word_dataset/metadata.csv
+git diff --cached --name-only | grep -E '\.(mp4|mov|avi)$'
+git status --short
+```
+
+출력 경로가 모두 `word_sign/examples/`로 시작하는지 확인한 뒤 커밋하고 올린다.
+
+```bash
+git commit -m "docs: add 12-class word sign examples"
+git push
+```
+
+`git push`에서 upstream 브랜치가 없다는 안내가 나오면 Git이 표시한 `git push --set-upstream ...` 명령을 한 번 실행한다. GitHub 웹사이트의 파일 제한에 걸릴 정도로 대표 영상이 크다면 영상을 더 추가하지 말고 별도 데이터 저장소를 사용한다.
 
 ## 3. 양손 + Pose 특징 추출
 
@@ -63,20 +113,20 @@ python word_sign/extract_word_landmarks.py --frames 60 --overwrite
 ## IDLE과 OTHER 촬영
 
 - `00_IDLE`: 4초 동안 특정 수어를 하지 않고 자연스럽게 대기한다. 손을 내린 자세, 준비 자세, 손을 편하게 든 자세 등을 다양하게 촬영한다.
-- `01_OTHER`: `나`, `가다`, `학교`, `먹다`, `아프다`가 아닌 동작 하나를 4초 안에 수행한다. 손 흔들기, 얼굴 만지기, 옷 정리, 물건 집기, 의미 없는 손동작 등을 다양하게 섞는다.
+- `01_OTHER`: 학습 대상 10개 단어가 아닌 동작 하나를 4초 안에 수행한다. 손 흔들기, 얼굴 만지기, 옷 정리, 물건 집기, 의미 없는 손동작 등을 다양하게 섞는다.
 
 `OTHER`에서 같은 동작만 반복하지 않는다. 실시간 출력에서는 모델 결과가 `IDLE` 또는 `OTHER`이면 단어로 추가하지 않는다.
 
 ## 4. 단어 LSTM 학습
 
-특징 CSV에 존재하는 클래스를 라벨 번호 순서대로 학습한다. `먹다`, `아프다`를 촬영하고 특징을 다시 추출하면 총 7개 클래스가 된다.
+특징 CSV에 존재하는 클래스를 라벨 번호 순서대로 학습한다. `07~11` 데이터를 촬영하고 특징을 다시 추출하면 총 12개 클래스가 된다.
 
 ```bash
 python word_sign/extract_word_landmarks.py --frames 60 --overwrite
-python word_sign/train_word_lstm.py --output word_sign/training/word_lstm_v2
+python word_sign/train_word_lstm.py --output word_sign/training/word_lstm_v2_12class
 ```
 
-현재 `word_lstm_v1`은 신규 클래스 추가 전의 5클래스 모델이다. 새 데이터 학습 결과는 기존 모델을 보존하도록 `word_lstm_v2/`에 저장한다. 한 촬영자의 영상을 무작위로 나눈 정확도는 새로운 사람에 대한 성능을 의미하지 않는다.
+현재 `word_lstm_v1`은 5클래스 시험 모델이다. 12클래스 학습 결과는 기존 모델을 보존하도록 `word_lstm_v2_12class/`에 저장한다. 한 촬영자의 영상을 무작위로 나눈 정확도는 새로운 사람에 대한 성능을 의미하지 않는다.
 
 ## 5. 실시간 테스트
 
