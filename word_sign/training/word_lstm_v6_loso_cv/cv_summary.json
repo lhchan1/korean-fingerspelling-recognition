@@ -1,0 +1,68 @@
+{
+  "cv_signers": [
+    "S001",
+    "S002",
+    "S003"
+  ],
+  "folds": [
+    {
+      "loss": 1.633453130722046,
+      "accuracy": 0.49071618914604187,
+      "macro_precision": 0.5403931629458961,
+      "macro_recall": 0.505124867929628,
+      "macro_f1": 0.4625368547525986,
+      "videos": 377,
+      "fold": 1,
+      "validation_signer": "S001",
+      "training_signers": [
+        "S002",
+        "S003"
+      ],
+      "train_videos": 776,
+      "best_epoch": 10,
+      "best_val_loss": 1.6334530115127563,
+      "epochs_trained": 22
+    },
+    {
+      "loss": 1.2272142171859741,
+      "accuracy": 0.5674931406974792,
+      "macro_precision": 0.6145155207768638,
+      "macro_recall": 0.5838332811194654,
+      "macro_f1": 0.5223227071031419,
+      "videos": 363,
+      "fold": 2,
+      "validation_signer": "S002",
+      "training_signers": [
+        "S001",
+        "S003"
+      ],
+      "train_videos": 790,
+      "best_epoch": 15,
+      "best_val_loss": 1.2272144556045532,
+      "epochs_trained": 27
+    },
+    {
+      "loss": 2.1996774673461914,
+      "accuracy": 0.4552057981491089,
+      "macro_precision": 0.41033784428026926,
+      "macro_recall": 0.44626566869510415,
+      "macro_f1": 0.39943566916311674,
+      "videos": 413,
+      "fold": 3,
+      "validation_signer": "S003",
+      "training_signers": [
+        "S001",
+        "S002"
+      ],
+      "train_videos": 740,
+      "best_epoch": 20,
+      "best_val_loss": 2.1996772289276123,
+      "epochs_trained": 32
+    }
+  ],
+  "mean_accuracy": 0.5044717093308767,
+  "std_accuracy": 0.04686165864051559,
+  "mean_macro_f1": 0.4614317436729524,
+  "std_macro_f1": 0.05017450864261694,
+  "recommended_final_epochs": 15
+}

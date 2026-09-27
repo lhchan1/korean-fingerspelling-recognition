@@ -35,11 +35,12 @@ SUPPRESSED_LABELS = {"IDLE", "OTHER"}
 
 def parse_args() -> argparse.Namespace:
     base = Path(__file__).resolve().parent
+    default_training = base / "training" / "word_lstm_v3_medical_24class"
     parser = argparse.ArgumentParser(description="단어 수어 LSTM 실시간 웹캠 테스트")
     parser.add_argument("--camera", type=int, default=0)
-    parser.add_argument("--model", type=Path, default=base / "training" / "word_lstm_v1" / "word_sign_lstm.keras")
-    parser.add_argument("--config", type=Path, default=base / "training" / "word_lstm_v1" / "config.json")
-    parser.add_argument("--labels", type=Path, default=base / "training" / "word_lstm_v1" / "labels.json")
+    parser.add_argument("--model", type=Path, default=default_training / "word_sign_lstm.keras")
+    parser.add_argument("--config", type=Path, default=default_training / "config.json")
+    parser.add_argument("--labels", type=Path, default=default_training / "labels.json")
     parser.add_argument("--hand-model", type=Path, default=base.parent / "models" / "hand_landmarker.task")
     parser.add_argument("--pose-model", type=Path, default=base.parent / "models" / "pose_landmarker_lite.task")
     parser.add_argument("--sample-fps", type=float, default=15.0)

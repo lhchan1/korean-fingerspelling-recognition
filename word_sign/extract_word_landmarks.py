@@ -31,14 +31,23 @@ def parse_args() -> argparse.Namespace:
                         default=base.parent / "models" / "pose_landmarker_lite.task")
     parser.add_argument("--output", type=Path, default=base / "word_features")
     parser.add_argument("--frames", type=int, default=TARGET_FRAMES)
+    parser.add_argument("--cpu", action="store_true",
+                        help="macOS Metal 충돌을 피하도록 MediaPipe CPU delegate 사용")
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
 
-def hand_landmarker(path: Path):
+def base_options(path: Path, use_cpu: bool):
+    options = {"model_asset_path": str(path)}
+    if use_cpu:
+        options["delegate"] = mp.tasks.BaseOptions.Delegate.CPU
+    return mp.tasks.BaseOptions(**options)
+
+
+def hand_landmarker(path: Path, use_cpu: bool = False):
     return mp.tasks.vision.HandLandmarker.create_from_options(
         mp.tasks.vision.HandLandmarkerOptions(
-            base_options=mp.tasks.BaseOptions(model_asset_path=str(path)),
+            base_options=base_options(path, use_cpu),
             running_mode=mp.tasks.vision.RunningMode.IMAGE, num_hands=2,
             min_hand_detection_confidence=0.5, min_hand_presence_confidence=0.5,
             min_tracking_confidence=0.5,
@@ -46,10 +55,10 @@ def hand_landmarker(path: Path):
     )
 
 
-def pose_landmarker(path: Path):
+def pose_landmarker(path: Path, use_cpu: bool = False):
     return mp.tasks.vision.PoseLandmarker.create_from_options(
         mp.tasks.vision.PoseLandmarkerOptions(
-            base_options=mp.tasks.BaseOptions(model_asset_path=str(path)),
+            base_options=base_options(path, use_cpu),
             running_mode=mp.tasks.vision.RunningMode.IMAGE, num_poses=1,
             min_pose_detection_confidence=0.5, min_pose_presence_confidence=0.5,
             min_tracking_confidence=0.5,
@@ -139,10 +148,12 @@ def main() -> int:
     with landmarks_path.open("w", newline="", encoding="utf-8-sig") as lf, \
          quality_path.open("w", newline="", encoding="utf-8-sig") as qf, ExitStack() as stack:
         writer = csv.DictWriter(lf, fieldnames=fields()); writer.writeheader()
-        qfields = ["sample_id", "label", "sampled_frames", "left_rate", "right_rate", "pose_rate", "result"]
+        qfields = ["sample_id", "signer_id", "label_index", "label", "file_path",
+                   "duration_sec", "sampled_frames", "left_rate", "right_rate",
+                   "active_hand_rate", "pose_rate", "quality_grade", "result"]
         qwriter = csv.DictWriter(qf, fieldnames=qfields); qwriter.writeheader()
-        hands = stack.enter_context(hand_landmarker(args.hand_model))
-        pose = stack.enter_context(pose_landmarker(args.pose_model))
+        hands = stack.enter_context(hand_landmarker(args.hand_model, args.cpu))
+        pose = stack.enter_context(pose_landmarker(args.pose_model, args.cpu))
         for n, row in enumerate(rows, 1):
             path = args.dataset / row["file_path"]
             cap = cv2.VideoCapture(str(path)); total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)); fps = float(cap.get(cv2.CAP_PROP_FPS))
@@ -171,11 +182,22 @@ def main() -> int:
             # non-sign body movement, so pose visibility is its core requirement.
             if label in {"IDLE", "OTHER"}:
                 quality_ok = pose_rate >= .8
+                quality_grade = "usable" if quality_ok else "exclude"
             else:
                 quality_ok = pose_rate >= .8 and active_hand_rate >= .4
-            qwriter.writerow({"sample_id": row["sample_id"], "label": row["label"],
+                if pose_rate < .8 or active_hand_rate < .2:
+                    quality_grade = "exclude"
+                elif active_hand_rate < .4:
+                    quality_grade = "caution"
+                else:
+                    quality_grade = "usable"
+            qwriter.writerow({"sample_id": row["sample_id"], "signer_id": row["signer_id"],
+                              "label_index": row["label_index"], "label": row["label"],
+                              "file_path": row["file_path"], "duration_sec": row.get("duration_sec", ""),
                               "sampled_frames": denom, "left_rate": round(left_count/denom, 4),
-                              "right_rate": round(right_count/denom, 4), "pose_rate": round(pose_count/denom, 4),
+                              "right_rate": round(right_count/denom, 4),
+                              "active_hand_rate": round(active_hand_rate, 4),
+                              "pose_rate": round(pose_count/denom, 4), "quality_grade": quality_grade,
                               "result": "ok" if quality_ok else "review"})
             print(f"[{n}/{len(rows)}] {row['sample_id']}")
     print(f"Saved: {landmarks_path}\nSaved: {quality_path}")

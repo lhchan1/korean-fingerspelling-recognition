@@ -1,0 +1,6 @@
+{
+  "test_loss": 0.15424054861068726,
+  "test_accuracy": 0.9516128897666931,
+  "epochs_trained": 34,
+  "warning": "Random video-level split; multiple signers may appear across train/validation/test, so this is not a signer-independent evaluation."
+}
