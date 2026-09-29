@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+  <head><meta charset="UTF-8"><title>Realtime sequence test</title></head>
+  <body>
+    <pre id="result">RUNNING</pre>
+    <script src="./public/vendor/tensorflow/tf.min.js"></script>
+    <script type="module">
+      import { WordSignInference } from "./src/inference.js";
+      const output = document.querySelector("#result");
+      try {
+        const inference = new WordSignInference();
+        await inference.initialize();
+        let state;
+        for (let index = 0; index < 60; index += 1) {
+          state = await inference.addFrame(new Array(146).fill(0), index * 67);
+        }
+        if (!state?.prediction || state.top.length !== 3) {
+          throw new Error("60프레임 이후 예측 결과가 생성되지 않았습니다.");
+        }
+        output.textContent = JSON.stringify({
+          status: "PASS",
+          bufferSize: state.size,
+          prediction: state.prediction,
+          topCount: state.top.length,
+        });
+        fetch("/api/log", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timestamp: "SEQUENCE_TEST", level: "INFO", message: "60×146 realtime inference PASS", detail: output.textContent }) });
+      } catch (error) {
+        output.textContent = JSON.stringify({ status: "FAIL", error: error.stack || error.message });
+        fetch("/api/log", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timestamp: "SEQUENCE_TEST", level: "ERROR", message: "60×146 realtime inference FAIL", detail: error.stack || error.message }) });
+      }
+    </script>
+  </body>
+</html>

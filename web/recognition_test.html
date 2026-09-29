@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+  <head><meta charset="UTF-8"><title>Recognition stabilizer test</title></head>
+  <body>
+    <pre id="result">RUNNING</pre>
+    <script type="module">
+      import { RecognitionStabilizer } from "./src/recognition.js";
+
+      const result = document.querySelector("#result");
+      try {
+        const recognizer = new RecognitionStabilizer();
+        for (let i = 0; i < 5; i += 1) recognizer.push({ label: "나", confidence: 0.9 });
+        for (let i = 0; i < 5; i += 1) recognizer.push({ label: "나", confidence: 0.9 });
+        if (recognizer.state().tokens.join(",") !== "나") throw new Error("held pose duplicated");
+
+        for (let i = 0; i < 5; i += 1) recognizer.push({ label: "IDLE", confidence: 0.9 });
+        for (let i = 0; i < 5; i += 1) recognizer.push({ label: "아프다", confidence: 0.9 });
+        for (let i = 0; i < 5; i += 1) recognizer.push({ label: "아프다", confidence: 0.9 });
+        const tokens = recognizer.state().tokens;
+        if (tokens.join(",") !== "나,아프다") throw new Error(`unexpected tokens: ${tokens}`);
+
+        recognizer.undo();
+        if (recognizer.state().tokens.join(",") !== "나") throw new Error("undo failed");
+        recognizer.clear();
+        if (recognizer.state().tokens.length !== 0) throw new Error("clear failed");
+
+        result.textContent = JSON.stringify({ status: "PASS", tokens: ["나", "아프다"] });
+      } catch (error) {
+        result.textContent = JSON.stringify({ status: "FAIL", error: error.message });
+      }
+    </script>
+  </body>
+</html>
