@@ -27,7 +27,14 @@
 
 카메라 영상은 서버로 전송하지 않습니다.
 
-## 로컬 실행
+## 실행 구조
+
+배포 서버에는 HTML/CSS/JavaScript와 함께 TensorFlow.js v7 가중치,
+MediaPipe `.task`, WASM 파일을 올립니다. 사용자가 처음 접속하면 브라우저가
+이 정적 파일들을 내려받고, 카메라 영상과 146차원 특징 추론은 사용자 기기
+안에서 처리합니다. 현재 웹은 카메라 영상이나 랜드마크를 서버로 전송하지 않습니다.
+
+## 로컬 개발 실행
 
 Python 3가 설치된 환경에서 다음 명령을 실행합니다.
 
@@ -38,16 +45,47 @@ python3 dev_server.py
 
 브라우저에서 <http://localhost:5173>을 열고 `카메라 시작`을 누릅니다.
 브라우저의 단계별 MediaPipe 로그가 페이지 하단과 실행한 터미널에 동시에 표시됩니다.
+`/api/log` 전송은 `localhost`, `127.0.0.1`, `::1`에서만 활성화됩니다.
+공개 배포 환경에서는 화면과 브라우저 콘솔에만 로그가 남습니다.
 
 > 카메라 API는 `localhost` 또는 HTTPS 환경에서만 사용할 수 있습니다.
+
+개발 전용 테스트 페이지는 `dev/`에 있습니다.
+
+- <http://localhost:5173/dev/model_test.html>
+- <http://localhost:5173/dev/sequence_test.html>
+- <http://localhost:5173/dev/recognition_test.html>
+
+## Cloudflare Pages 공개 배포
+
+이 폴더를 GitHub 저장소의 `web/`에 넣은 다음 Cloudflare Pages에서 저장소를
+연결합니다.
+
+```text
+Production branch: main
+Root directory: web
+Build command: 비움 (필요하면 exit 0)
+Build output directory: .
+```
+
+배포 후 발급되는 `https://<project>.pages.dev` 주소에서 카메라를 테스트합니다.
+`_headers`는 카메라 권한을 같은 출처로 제한하고, 보안 헤더·WASM MIME 타입·
+버전된 v7 가중치의 장기 캐시를 설정합니다. `model.json`, `config.json`,
+`labels.json`은 재배포 시 갱신되도록 캐시하지 않습니다.
+
+배포 전에 비밀정보 검사를 다시 실행하고, API 키는 절대로 이 정적 폴더에
+저장하지 않습니다. 향후 LLM을 연결할 때는 Cloudflare Worker 같은 서버 함수에
+키를 비밀 변수로 보관하고 확정된 단어만 전송해야 합니다.
 
 ## 디렉터리 구조
 
 ```text
 capstone-web/
+├── _headers             # Cloudflare 보안·캐시·WASM 헤더
+├── dev/                 # 개발 전용 테스트 페이지
 ├── public/
 │   └── models/
-│       └── word-sign/    # 변환된 TensorFlow.js 모델을 둘 위치
+│       └── word-sign/    # v7 TensorFlow.js 모델과 가중치
 ├── src/
 │   ├── camera.js         # 카메라 생명주기와 오류 처리
 │   ├── main.js           # 화면 상태와 이벤트 연결
@@ -61,4 +99,4 @@ capstone-web/
 
 1. 실제 수어 영상으로 임계값과 안정화 횟수 조정
 2. 모바일 성능과 정확도 검증
-3. 확정된 단어만 문장 생성 API로 전송
+3. 확정된 단어만 보안 처리된 문장 생성 API로 전송

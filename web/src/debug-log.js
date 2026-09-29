@@ -54,13 +54,18 @@ export class DebugLogger {
   }
 
   sendToTerminal(payload) {
+    const isLocalDevelopment = ["localhost", "127.0.0.1", "::1"].includes(
+      window.location.hostname,
+    );
+    if (!isLocalDevelopment) return;
+
     fetch("/api/log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       keepalive: true,
     }).catch(() => {
-      // 기본 http.server로 실행한 경우 화면/브라우저 로그만 사용합니다.
+      // dev_server.py가 없으면 화면과 브라우저 콘솔 로그만 사용합니다.
     });
   }
 }

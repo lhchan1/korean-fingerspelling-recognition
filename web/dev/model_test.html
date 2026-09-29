@@ -3,12 +3,12 @@
   <head><meta charset="UTF-8"><title>TensorFlow.js model test</title></head>
   <body>
     <pre id="result">RUNNING</pre>
-    <script src="./public/vendor/tensorflow/tf.min.js"></script>
+    <script src="../public/vendor/tensorflow/tf.min.js"></script>
     <script>
       (async () => {
         const output = document.querySelector("#result");
         try {
-          const model = await tf.loadLayersModel("./public/models/word-sign/model.json");
+          const model = await tf.loadLayersModel("../public/models/word-sign/model.json?v=word-lstm-v7");
           const probabilities = tf.tidy(() =>
             Array.from(model.predict(tf.zeros([1, 60, 146], "float32")).dataSync())
           );
@@ -21,10 +21,8 @@
             probabilitySum: probabilities.reduce((sum, value) => sum + value, 0),
             probabilities,
           });
-          fetch("/api/log", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timestamp: "MODEL_TEST", level: "INFO", message: "TensorFlow.js model PASS", detail: JSON.stringify({ inputShape: model.inputs[0].shape, outputShape: model.outputs[0].shape, probabilityCount: probabilities.length, probabilitySum: probabilities.reduce((sum, value) => sum + value, 0) }) }) });
         } catch (error) {
           output.textContent = JSON.stringify({ status: "FAIL", error: error.stack || error.message });
-          fetch("/api/log", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ timestamp: "MODEL_TEST", level: "ERROR", message: "TensorFlow.js model FAIL", detail: error.stack || error.message }) });
         }
       })();
     </script>

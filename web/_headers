@@ -1,0 +1,22 @@
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+
+/public/vendor/mediapipe/tasks-vision/wasm/*.wasm
+  Content-Type: application/wasm
+  Cache-Control: public, max-age=31536000, immutable
+
+/public/models/word-sign/word-lstm-v7.weights.bin
+  Cache-Control: public, max-age=31536000, immutable
+
+/public/models/word-sign/model.json
+  Cache-Control: no-cache
+
+/public/models/word-sign/config.json
+  Cache-Control: no-cache
+
+/public/models/word-sign/labels.json
+  Cache-Control: no-cache

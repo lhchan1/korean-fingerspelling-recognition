@@ -1,6 +1,7 @@
-const MODEL_URL = "/public/models/word-sign/model.json";
-const CONFIG_URL = "/public/models/word-sign/config.json";
-const LABELS_URL = "/public/models/word-sign/labels.json";
+const MODEL_VERSION = "word-lstm-v7";
+const MODEL_URL = `/public/models/word-sign/model.json?v=${MODEL_VERSION}`;
+const CONFIG_URL = `/public/models/word-sign/config.json?v=${MODEL_VERSION}`;
+const LABELS_URL = `/public/models/word-sign/labels.json?v=${MODEL_VERSION}`;
 
 export class WordSignInference {
   constructor(onLog) {
