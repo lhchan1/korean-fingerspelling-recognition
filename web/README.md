@@ -24,6 +24,8 @@
 - 신뢰도 75% 이상 예측을 최근 5회 중 3회 다수결로 안정화
 - IDLE/OTHER 전환 기반 동일 동작 중복 방지
 - 확정 단어 누적, 마지막 단어 취소, 전체 지우기
+- 모바일에서는 MediaPipe CPU delegate와 640×480 카메라를 사용해 WebGL 호환성을 확보
+- MediaPipe 프레임 오류가 발생해도 검출 루프를 유지하고 화면 로그에 원인 표시
 
 카메라 영상은 서버로 전송하지 않습니다.
 
@@ -72,6 +74,8 @@ Build output directory: .
 `_headers`는 카메라 권한을 같은 출처로 제한하고, 보안 헤더·WASM MIME 타입·
 버전된 v7 가중치의 장기 캐시를 설정합니다. `model.json`, `config.json`,
 `labels.json`은 재배포 시 갱신되도록 캐시하지 않습니다.
+TensorFlow.js 4.22 번들이 런타임에 동적 함수를 생성하므로 `script-src`에는
+`'unsafe-eval'`이 포함됩니다. 외부 스크립트 출처는 허용하지 않고 `'self'`만 유지합니다.
 
 배포 전에 비밀정보 검사를 다시 실행하고, API 키는 절대로 이 정적 폴더에
 저장하지 않습니다. 향후 LLM을 연결할 때는 Cloudflare Worker 같은 서버 함수에

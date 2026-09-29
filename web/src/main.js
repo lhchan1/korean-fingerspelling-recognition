@@ -185,7 +185,9 @@ async function startCamera() {
     elements.modelState.textContent = "불러오는 중";
     setStatus("카메라 연결 완료 · MediaPipe 모델을 불러오는 중입니다…", "loading");
     try {
-      await Promise.all([handLandmarker.initialize(), inference.initialize()]);
+      // 모바일 브라우저의 순간 메모리 사용량을 줄이기 위해 큰 런타임을 순차 로드합니다.
+      await handLandmarker.initialize();
+      await inference.initialize();
       modelReady = true;
       elements.modelState.textContent = "준비 완료";
       handLandmarker.start();

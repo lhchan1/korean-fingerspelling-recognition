@@ -9,6 +9,11 @@ const POSE_INDICES = [11, 12, 13, 14, 15, 16];
 const POSE_CONNECTIONS = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16]];
 const FEATURE_COUNT = 146;
 
+function isMobileDevice() {
+  return navigator.userAgentData?.mobile === true ||
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
 const WASM_PATH =
   "/public/vendor/mediapipe/tasks-vision/wasm";
 const MODULE_PATH =
@@ -42,6 +47,7 @@ export class BrowserHandLandmarker {
     this.lastHandCount = null;
     this.lastPoseDetected = null;
     this.lastInferenceTime = 0;
+    this.lastFrameErrorAt = 0;
     this.sampleIntervalMs = 1000 / 15;
   }
 
@@ -60,8 +66,14 @@ export class BrowserHandLandmarker {
       "WASM 초기화",
     );
     this.log("MediaPipe WASM 초기화 완료");
+    const preferredDelegate = isMobileDevice() ? "CPU" : "GPU";
+    this.log("MediaPipe 실행 환경", {
+      mobile: isMobileDevice(),
+      delegate: preferredDelegate,
+      userAgent: navigator.userAgent,
+    });
     const options = {
-      baseOptions: { modelAssetPath: MODEL_PATH, delegate: "GPU" },
+      baseOptions: { modelAssetPath: MODEL_PATH, delegate: preferredDelegate },
       runningMode: "VIDEO",
       numHands: 2,
       minHandDetectionConfidence: 0.5,
@@ -70,14 +82,15 @@ export class BrowserHandLandmarker {
     };
 
     try {
-      this.log("Hand Landmarker GPU 초기화 시작");
+      this.log(`Hand Landmarker ${preferredDelegate} 초기화 시작`);
       this.landmarker = await withTimeout(
         HandLandmarker.createFromOptions(vision, options),
         30000,
-        "GPU 모델 초기화",
+        `${preferredDelegate} 모델 초기화`,
       );
-      this.log("Hand Landmarker GPU 초기화 완료");
+      this.log(`Hand Landmarker ${preferredDelegate} 초기화 완료`);
     } catch (gpuError) {
+      if (preferredDelegate === "CPU") throw gpuError;
       console.warn("MediaPipe GPU 초기화 실패, CPU로 재시도합니다.", gpuError);
       this.log("GPU 초기화 실패, CPU로 재시도", gpuError.message);
       options.baseOptions.delegate = "CPU";
@@ -90,7 +103,7 @@ export class BrowserHandLandmarker {
     }
 
     const poseOptions = {
-      baseOptions: { modelAssetPath: POSE_MODEL_PATH, delegate: "GPU" },
+      baseOptions: { modelAssetPath: POSE_MODEL_PATH, delegate: preferredDelegate },
       runningMode: "VIDEO",
       numPoses: 1,
       minPoseDetectionConfidence: 0.5,
@@ -99,14 +112,15 @@ export class BrowserHandLandmarker {
     };
 
     try {
-      this.log("Pose Landmarker GPU 초기화 시작");
+      this.log(`Pose Landmarker ${preferredDelegate} 초기화 시작`);
       this.poseLandmarker = await withTimeout(
         PoseLandmarker.createFromOptions(vision, poseOptions),
         30000,
-        "Pose GPU 모델 초기화",
+        `Pose ${preferredDelegate} 모델 초기화`,
       );
-      this.log("Pose Landmarker GPU 초기화 완료");
+      this.log(`Pose Landmarker ${preferredDelegate} 초기화 완료`);
     } catch (gpuError) {
+      if (preferredDelegate === "CPU") throw gpuError;
       this.log("Pose GPU 초기화 실패, CPU로 재시도", gpuError.message);
       poseOptions.baseOptions.delegate = "CPU";
       this.poseLandmarker = await withTimeout(
@@ -129,6 +143,7 @@ export class BrowserHandLandmarker {
     this.lastHandCount = null;
     this.lastPoseDetected = null;
     this.lastInferenceTime = 0;
+    this.lastFrameErrorAt = 0;
     this.predict();
   }
 
@@ -141,50 +156,59 @@ export class BrowserHandLandmarker {
   }
 
   predict = () => {
-    if (this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      this.resizeCanvas();
+    try {
+      if (this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        this.resizeCanvas();
 
-      const now = performance.now();
-      if (
-        this.video.currentTime !== this.lastVideoTime &&
-        now - this.lastInferenceTime >= this.sampleIntervalMs
-      ) {
-        const startedAt = performance.now();
-        const result = this.landmarker.detectForVideo(this.video, startedAt);
-        const poseResult = this.poseLandmarker.detectForVideo(this.video, startedAt);
-        this.lastVideoTime = this.video.currentTime;
-        this.lastInferenceTime = now;
-        const hands = result.landmarks ?? [];
-        const poses = poseResult.landmarks ?? [];
-        const features = featuresForFrame(result, poseResult);
-        this.draw(hands, poses[0] ?? null);
-        this.recordFrame(performance.now());
+        const now = performance.now();
+        if (
+          this.video.currentTime !== this.lastVideoTime &&
+          now - this.lastInferenceTime >= this.sampleIntervalMs
+        ) {
+          const startedAt = performance.now();
+          const result = this.landmarker.detectForVideo(this.video, startedAt);
+          const poseResult = this.poseLandmarker.detectForVideo(this.video, startedAt);
+          this.lastVideoTime = this.video.currentTime;
+          this.lastInferenceTime = now;
+          const hands = result.landmarks ?? [];
+          const poses = poseResult.landmarks ?? [];
+          const features = featuresForFrame(result, poseResult);
+          this.draw(hands, poses[0] ?? null);
+          this.recordFrame(performance.now());
 
-        if (hands.length !== this.lastHandCount) {
-          this.log("손 검출 개수 변경", {
+          if (hands.length !== this.lastHandCount) {
+            this.log("손 검출 개수 변경", {
+              handCount: hands.length,
+              handedness: (result.handedness ?? []).map(
+                (categories) => categories[0]?.categoryName ?? "unknown",
+              ),
+            });
+            this.lastHandCount = hands.length;
+          }
+
+          const poseDetected = poses.length > 0;
+          if (poseDetected !== this.lastPoseDetected) {
+            this.log("상체 Pose 검출 상태 변경", { poseDetected });
+            this.lastPoseDetected = poseDetected;
+          }
+
+          this.onResult?.({
             handCount: hands.length,
-            handedness: (result.handedness ?? []).map(
-              (categories) => categories[0]?.categoryName ?? "unknown",
-            ),
+            poseDetected,
+            features,
+            fps: this.calculateFps(),
+            handResult: result,
+            poseResult,
+            timestamp: now,
           });
-          this.lastHandCount = hands.length;
         }
-
-        const poseDetected = poses.length > 0;
-        if (poseDetected !== this.lastPoseDetected) {
-          this.log("상체 Pose 검출 상태 변경", { poseDetected });
-          this.lastPoseDetected = poseDetected;
-        }
-
-        this.onResult?.({
-          handCount: hands.length,
-          poseDetected,
-          features,
-          fps: this.calculateFps(),
-          handResult: result,
-          poseResult,
-          timestamp: now,
-        });
+      }
+    } catch (error) {
+      const now = performance.now();
+      if (now - this.lastFrameErrorAt >= 5000) {
+        this.log("MediaPipe 프레임 처리 오류", error?.message ?? String(error));
+        console.error("MediaPipe frame processing failed:", error);
+        this.lastFrameErrorAt = now;
       }
     }
 
