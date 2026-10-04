@@ -24,6 +24,8 @@
 - 신뢰도 75% 이상 예측을 최근 5회 중 3회 다수결로 안정화
 - IDLE/OTHER 전환 기반 동일 동작 중복 방지
 - 확정 단어 누적, 마지막 단어 취소, 전체 지우기
+- 확정 단어가 있는 상태에서 IDLE이 3초 유지되면 문장을 자동 확정
+- 서버 연동 전 단계로 `{ words, clientCreatedAt, source }` JSON payload 생성
 - 모바일에서는 MediaPipe CPU delegate와 640×480 카메라를 사용해 WebGL 호환성을 확보
 - MediaPipe 프레임 오류가 발생해도 검출 루프를 유지하고 화면 로그에 원인 표시
 
@@ -103,4 +105,4 @@ capstone-web/
 
 1. 실제 수어 영상으로 임계값과 안정화 횟수 조정
 2. 모바일 성능과 정확도 검증
-3. 확정된 단어만 보안 처리된 문장 생성 API로 전송
+3. `sentence-ready` 이벤트의 payload를 보안 처리된 문장 생성 API로 전송

@@ -4,7 +4,7 @@
   <body>
     <pre id="result">RUNNING</pre>
     <script type="module">
-      import { RecognitionStabilizer } from "../src/recognition.js";
+      import { IdleSentenceCollector, RecognitionStabilizer } from "../src/recognition.js";
 
       const result = document.querySelector("#result");
       try {
@@ -24,7 +24,37 @@
         recognizer.clear();
         if (recognizer.state().tokens.length !== 0) throw new Error("clear failed");
 
-        result.textContent = JSON.stringify({ status: "PASS", tokens: ["나", "아프다"] });
+        for (let index = 0; index < 13; index += 1) {
+          for (let vote = 0; vote < 5; vote += 1) {
+            recognizer.push({ label: `단어${index}`, confidence: 0.9 });
+          }
+          for (let vote = 0; vote < 5; vote += 1) {
+            recognizer.push({ label: "IDLE", confidence: 0.9 });
+          }
+        }
+        const longTokens = recognizer.state().tokens;
+        if (longTokens.length !== 13 || longTokens[0] !== "단어0") {
+          throw new Error("long sentence was truncated");
+        }
+        recognizer.clear();
+
+        const collector = new IdleSentenceCollector({ idleDurationMs: 3000 });
+        const idleState = { stableLabel: "IDLE", tokens: ["나", "아프다"] };
+        if (collector.update(idleState, 1000).ready) throw new Error("idle completed early");
+        const counting = collector.update(idleState, 3000);
+        if (!counting.active || counting.remainingMs !== 1000) throw new Error("idle countdown failed");
+        const cancelled = collector.update({ stableLabel: "나", tokens: ["나", "아프다"] }, 3500);
+        if (cancelled.active || cancelled.ready) throw new Error("idle cancellation failed");
+        collector.update(idleState, 4000);
+        const ready = collector.update(idleState, 7000);
+        if (!ready.ready || ready.payload.words.join(",") !== "나,아프다") {
+          throw new Error("sentence payload failed");
+        }
+        if (collector.update({ stableLabel: "IDLE", tokens: [] }, 10000).ready) {
+          throw new Error("empty sentence was emitted");
+        }
+
+        result.textContent = JSON.stringify({ status: "PASS", payload: ready.payload });
       } catch (error) {
         result.textContent = JSON.stringify({ status: "FAIL", error: error.message });
       }

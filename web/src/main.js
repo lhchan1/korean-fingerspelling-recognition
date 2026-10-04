@@ -2,7 +2,7 @@ import { CameraController, cameraErrorMessage } from "./camera.js";
 import { BrowserHandLandmarker } from "./hand-landmarker.js";
 import { DebugLogger } from "./debug-log.js";
 import { WordSignInference } from "./inference.js";
-import { RecognitionStabilizer } from "./recognition.js";
+import { IdleSentenceCollector, RecognitionStabilizer } from "./recognition.js";
 
 const elements = {
   video: document.querySelector("#camera"),
@@ -12,7 +12,6 @@ const elements = {
   cameraLabel: document.querySelector("#cameraLabel"),
   statusDot: document.querySelector("#statusDot"),
   statusMessage: document.querySelector("#statusMessage"),
-  securityBadge: document.querySelector("#securityBadge"),
   startButton: document.querySelector("#startButton"),
   switchButton: document.querySelector("#switchButton"),
   stopButton: document.querySelector("#stopButton"),
@@ -32,13 +31,17 @@ const elements = {
   recognizedTokens: document.querySelector("#recognizedTokens"),
   undoTokenButton: document.querySelector("#undoTokenButton"),
   clearTokensButton: document.querySelector("#clearTokensButton"),
+  idleState: document.querySelector("#idleState"),
+  pendingPayload: document.querySelector("#pendingPayload"),
 };
 
 const camera = new CameraController(elements.video);
 const logger = new DebugLogger(elements.debugLog);
 const inference = new WordSignInference((message, detail) => logger.info(message, detail));
 const recognizer = new RecognitionStabilizer();
+const sentenceCollector = new IdleSentenceCollector({ idleDurationMs: 3000 });
 let predictionBusy = false;
+let sentenceReadyForServer = false;
 const handLandmarker = new BrowserHandLandmarker(
   elements.video,
   elements.landmarkCanvas,
@@ -86,11 +89,49 @@ function renderPrediction(state) {
   const recognitionState = recognizer.push(state.prediction);
   renderRecognition(recognitionState);
   if (recognitionState.added) {
+    sentenceReadyForServer = false;
     logger.info("단어 확정", {
       label: recognitionState.added,
       tokens: recognitionState.tokens,
     });
   }
+
+  const sentenceState = sentenceCollector.update(recognitionState);
+  renderSentenceState(sentenceState);
+  if (sentenceState.ready) finalizeSentence(sentenceState.payload);
+}
+
+function finalizeSentence(payload) {
+  // 서버 API가 정해지면 이 함수 안에서 payload를 fetch로 전송합니다.
+  elements.pendingPayload.textContent = JSON.stringify(payload, null, 2);
+  logger.info("문장 전송 준비 완료", payload);
+  window.dispatchEvent(new CustomEvent("sentence-ready", { detail: payload }));
+  sentenceReadyForServer = true;
+
+  renderRecognition(recognizer.clear());
+  renderSentenceState(sentenceCollector.reset(), "전송 대기 데이터 생성 완료");
+}
+
+function renderSentenceState(state, message = null) {
+  if (message) {
+    elements.idleState.textContent = message;
+    elements.idleState.dataset.state = "ready";
+    return;
+  }
+  if (!state.active) {
+    if (sentenceReadyForServer) {
+      elements.idleState.textContent = "전송 대기 데이터 생성 완료";
+      elements.idleState.dataset.state = "ready";
+      return;
+    }
+    elements.idleState.textContent = "단어 입력 후 IDLE 3초를 기다립니다.";
+    elements.idleState.dataset.state = "waiting";
+    return;
+  }
+
+  elements.idleState.textContent =
+    `IDLE 유지 중 · ${(state.remainingMs / 1000).toFixed(1)}초 후 자동 확정`;
+  elements.idleState.dataset.state = "counting";
 }
 
 function renderRecognition(state) {
@@ -147,9 +188,6 @@ function renderCameraState() {
 function renderSecurityState() {
   const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(location.hostname);
   const isSafe = window.isSecureContext || isLocalhost;
-
-  elements.securityBadge.textContent = isSafe ? "카메라 사용 가능" : "HTTPS 필요";
-  elements.securityBadge.dataset.state = isSafe ? "ok" : "warning";
 
   if (!isSafe) {
     setStatus("카메라를 사용하려면 HTTPS 또는 localhost로 접속해야 합니다.", "error");
@@ -233,7 +271,10 @@ function stopCamera() {
   handLandmarker.stop();
   camera.stop();
   inference.reset();
+  sentenceCollector.reset();
+  sentenceReadyForServer = false;
   renderRecognition(recognizer.resetWindow());
+  renderSentenceState(sentenceCollector.state());
   renderPrediction({ size: 0, progress: 0 });
   renderCameraState();
   setStatus("카메라를 종료했습니다.", "idle");
@@ -244,22 +285,29 @@ elements.switchButton.addEventListener("click", switchCamera);
 elements.stopButton.addEventListener("click", stopCamera);
 elements.clearLogButton.addEventListener("click", () => logger.clear());
 elements.undoTokenButton.addEventListener("click", () => {
+  sentenceCollector.reset();
+  sentenceReadyForServer = false;
   const state = recognizer.undo();
   renderRecognition(state);
+  renderSentenceState(sentenceCollector.state());
   logger.info("마지막 확정 단어 취소", { removed: state.removed, tokens: state.tokens });
 });
 elements.clearTokensButton.addEventListener("click", () => {
+  sentenceCollector.reset();
+  sentenceReadyForServer = false;
   renderRecognition(recognizer.clear());
+  renderSentenceState(sentenceCollector.state());
   logger.info("확정 단어 전체 지우기");
 });
 window.addEventListener("pagehide", () => {
-  handLandmarker.stop();
+  handLandmarker.dispose();
   camera.stop();
 });
 
 renderCameraState();
 renderSecurityState();
 renderRecognition(recognizer.state());
+renderSentenceState(sentenceCollector.state());
 logger.info("페이지 초기화 완료", {
   secureContext: window.isSecureContext,
   userAgent: navigator.userAgent,

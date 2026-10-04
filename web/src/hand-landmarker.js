@@ -52,7 +52,8 @@ export class BrowserHandLandmarker {
   }
 
   async initialize() {
-    if (this.landmarker) return;
+    if (this.landmarker && this.poseLandmarker) return;
+    this.closeLandmarkers();
 
     this.log("MediaPipe JavaScript 모듈 로딩 시작");
     const { FilesetResolver, HandLandmarker, PoseLandmarker } = await import(
@@ -112,23 +113,28 @@ export class BrowserHandLandmarker {
     };
 
     try {
-      this.log(`Pose Landmarker ${preferredDelegate} 초기화 시작`);
-      this.poseLandmarker = await withTimeout(
-        PoseLandmarker.createFromOptions(vision, poseOptions),
-        30000,
-        `Pose ${preferredDelegate} 모델 초기화`,
-      );
-      this.log(`Pose Landmarker ${preferredDelegate} 초기화 완료`);
-    } catch (gpuError) {
-      if (preferredDelegate === "CPU") throw gpuError;
-      this.log("Pose GPU 초기화 실패, CPU로 재시도", gpuError.message);
-      poseOptions.baseOptions.delegate = "CPU";
-      this.poseLandmarker = await withTimeout(
-        PoseLandmarker.createFromOptions(vision, poseOptions),
-        30000,
-        "Pose CPU 모델 초기화",
-      );
-      this.log("Pose Landmarker CPU 초기화 완료");
+      try {
+        this.log(`Pose Landmarker ${preferredDelegate} 초기화 시작`);
+        this.poseLandmarker = await withTimeout(
+          PoseLandmarker.createFromOptions(vision, poseOptions),
+          30000,
+          `Pose ${preferredDelegate} 모델 초기화`,
+        );
+        this.log(`Pose Landmarker ${preferredDelegate} 초기화 완료`);
+      } catch (gpuError) {
+        if (preferredDelegate === "CPU") throw gpuError;
+        this.log("Pose GPU 초기화 실패, CPU로 재시도", gpuError.message);
+        poseOptions.baseOptions.delegate = "CPU";
+        this.poseLandmarker = await withTimeout(
+          PoseLandmarker.createFromOptions(vision, poseOptions),
+          30000,
+          "Pose CPU 모델 초기화",
+        );
+        this.log("Pose Landmarker CPU 초기화 완료");
+      }
+    } catch (error) {
+      this.closeLandmarkers();
+      throw error;
     }
   }
 
@@ -153,6 +159,18 @@ export class BrowserHandLandmarker {
     this.lastVideoTime = -1;
     this.clear();
     this.onResult?.({ handCount: 0, fps: 0 });
+  }
+
+  closeLandmarkers() {
+    this.landmarker?.close();
+    this.poseLandmarker?.close();
+    this.landmarker = null;
+    this.poseLandmarker = null;
+  }
+
+  dispose() {
+    this.stop();
+    this.closeLandmarkers();
   }
 
   predict = () => {
@@ -197,8 +215,6 @@ export class BrowserHandLandmarker {
             poseDetected,
             features,
             fps: this.calculateFps(),
-            handResult: result,
-            poseResult,
             timestamp: now,
           });
         }
@@ -352,5 +368,3 @@ function vector(point, center, scale) {
     (point.z - center[2]) / scale,
   ];
 }
-
-export { FEATURE_COUNT, POSE_INDICES, featuresForFrame };

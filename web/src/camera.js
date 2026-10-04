@@ -34,8 +34,13 @@ export class CameraController {
 
     this.stream = await navigator.mediaDevices.getUserMedia(constraints);
     this.video.srcObject = this.stream;
-    await this.video.play();
-    return this.stream;
+    try {
+      await this.video.play();
+      return this.stream;
+    } catch (error) {
+      this.stop();
+      throw error;
+    }
   }
 
   stop() {
@@ -49,8 +54,14 @@ export class CameraController {
   }
 
   async switchFacingMode() {
+    const previousFacingMode = this.facingMode;
     this.facingMode = this.isFrontCamera ? "environment" : "user";
-    return this.start();
+    try {
+      return await this.start();
+    } catch (error) {
+      this.facingMode = previousFacingMode;
+      throw error;
+    }
   }
 }
 

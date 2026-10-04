@@ -32,15 +32,6 @@ video {
   padding: 48px 0 64px;
 }
 
-.app-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.eyebrow,
 .card-label {
   margin: 0 0 8px;
   color: #69e697;
@@ -49,45 +40,9 @@ video {
   letter-spacing: 0.13em;
 }
 
-h1,
 h2,
 p {
   margin-top: 0;
-}
-
-h1 {
-  margin-bottom: 10px;
-  font-size: clamp(2rem, 5vw, 3.7rem);
-  line-height: 1.05;
-  letter-spacing: -0.055em;
-}
-
-.subtitle {
-  max-width: 680px;
-  margin-bottom: 0;
-  color: #9caec3;
-  line-height: 1.65;
-}
-
-.badge {
-  flex: 0 0 auto;
-  padding: 9px 12px;
-  border: 1px solid #26364b;
-  border-radius: 999px;
-  color: #9caec3;
-  background: rgba(13, 24, 39, 0.72);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.badge[data-state="ok"] {
-  border-color: rgba(105, 230, 151, 0.35);
-  color: #91f1b4;
-}
-
-.badge[data-state="warning"] {
-  border-color: rgba(251, 191, 36, 0.42);
-  color: #fcd56b;
 }
 
 .camera-card,
@@ -424,6 +379,46 @@ h1 {
   font-size: 0.86rem;
 }
 
+.sentence-ready-panel {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #26364b;
+  border-radius: 14px;
+  background: rgba(5, 11, 19, 0.55);
+}
+
+.idle-state,
+.payload-label {
+  margin: 0;
+  color: #8fa3ba;
+  font-size: 0.82rem;
+}
+
+.idle-state[data-state="counting"] {
+  color: #fcd56b;
+}
+
+.idle-state[data-state="ready"] {
+  color: #91f1b4;
+}
+
+.payload-label {
+  margin-top: 12px;
+  font-weight: 750;
+}
+
+.pending-payload {
+  overflow: auto;
+  max-height: 150px;
+  margin: 8px 0 0;
+  padding: 11px;
+  border-radius: 9px;
+  color: #a7f3d0;
+  background: #02050a;
+  font: 12px/1.55 "SFMono-Regular", Consolas, monospace;
+  white-space: pre-wrap;
+}
+
 .prediction-panel {
   padding: 18px;
   border: 1px solid #26364b;
@@ -467,15 +462,6 @@ h1 {
   .app-shell {
     width: min(100% - 20px, 1040px);
     padding: 24px 0 40px;
-  }
-
-  .app-header {
-    display: block;
-  }
-
-  .badge {
-    display: inline-block;
-    margin-top: 16px;
   }
 
   .camera-card {
