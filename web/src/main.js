@@ -1,7 +1,7 @@
 import { CameraController, cameraErrorMessage } from "./camera.js";
 import { BrowserHandLandmarker } from "./hand-landmarker.js";
 import { DebugLogger } from "./debug-log.js";
-import { WordSignInference } from "./inference.js";
+import { WORD_SIGN_LABELS_URL, WordSignInference } from "./inference.js";
 import {
   KOBART_WEBSOCKET_URL,
   requestKoreanSentence,
@@ -38,6 +38,8 @@ const elements = {
   idleState: document.querySelector("#idleState"),
   generationState: document.querySelector("#generationState"),
   generatedSentence: document.querySelector("#generatedSentence"),
+  randomTestButton: document.querySelector("#randomTestButton"),
+  randomTestWord: document.querySelector("#randomTestWord"),
 };
 
 const camera = new CameraController(elements.video);
@@ -48,6 +50,8 @@ const sentenceCollector = new IdleSentenceCollector({ idleDurationMs: 3000 });
 let predictionBusy = false;
 let requestInFlight = false;
 let idleSegmentConsumed = false;
+let randomTestBusy = false;
+let testableLabels = null;
 let lastFeatureTimestamp = null;
 let scrollPaused = false;
 let scrollResumeTimer = null;
@@ -185,16 +189,26 @@ function renderPrediction(state) {
   if (sentenceState.ready) sendSentenceRequest(sentenceState.payload.words);
 }
 
-async function sendSentenceRequest(words) {
-  if (requestInFlight || idleSegmentConsumed || words.length === 0) return;
+async function sendSentenceRequest(
+  words,
+  {
+    consumeRecognizedWords = true,
+    markIdleSegment = true,
+    requestLabel = "인식 단어",
+  } = {},
+) {
+  if (requestInFlight || (markIdleSegment && idleSegmentConsumed) || words.length === 0) {
+    return;
+  }
 
   const sentWords = [...words];
   requestInFlight = true;
-  idleSegmentConsumed = true;
+  if (markIdleSegment) idleSegmentConsumed = true;
   sentenceCollector.reset();
   renderRecognition(recognizer.state());
   logger.info("KoBART 문장 생성 요청 시작", {
     url: KOBART_WEBSOCKET_URL,
+    requestLabel,
     words: sentWords,
   });
 
@@ -215,15 +229,26 @@ async function sendSentenceRequest(words) {
       },
     });
 
-    const recognitionState = recognizer.consumePrefix(sentWords);
-    if (!recognitionState.consumed) {
-      throw new Error("전송한 단어와 현재 단어 목록이 달라 결과를 적용하지 않았습니다.");
+    let recognitionState = recognizer.state();
+    if (consumeRecognizedWords) {
+      recognitionState = recognizer.consumePrefix(sentWords);
+      if (!recognitionState.consumed) {
+        throw new Error("전송한 단어와 현재 단어 목록이 달라 결과를 적용하지 않았습니다.");
+      }
     }
 
     elements.generatedSentence.textContent = response.sentence;
-    renderGenerationState("success", "한국어 문장 생성이 완료되었습니다.");
+    renderGenerationState(
+      "success",
+      `${requestLabel} 전송 및 한국어 문장 생성이 완료되었습니다.`,
+    );
     renderRecognition(recognitionState);
-    renderSentenceState(sentenceCollector.state(), "전송 완료 · 새 수어 동작을 기다립니다.");
+    renderSentenceState(
+      sentenceCollector.state(),
+      consumeRecognizedWords
+        ? "전송 완료 · 새 수어 동작을 기다립니다."
+        : "랜덤 단어 통신 테스트 완료",
+    );
     logger.info("KoBART 문장 생성 성공", {
       session_id: response.sessionId,
       sentence: response.sentence,
@@ -236,6 +261,56 @@ async function sendSentenceRequest(words) {
     logger.error("KoBART 문장 생성 실패", error);
   } finally {
     requestInFlight = false;
+    renderRecognition(recognizer.state());
+  }
+}
+
+async function loadTestableLabels() {
+  if (testableLabels) return testableLabels;
+
+  const response = await fetch(WORD_SIGN_LABELS_URL);
+  if (!response.ok) throw new Error("모델 라벨 파일을 불러오지 못했습니다.");
+
+  const labels = await response.json();
+  if (!Array.isArray(labels) || labels.length !== 24) {
+    throw new Error("24클래스 모델 라벨 구성이 올바르지 않습니다.");
+  }
+
+  testableLabels = labels.filter((label) => label !== "IDLE" && label !== "OTHER");
+  if (testableLabels.length !== 22) {
+    throw new Error("IDLE·OTHER 제외 후 테스트 라벨 개수가 22개가 아닙니다.");
+  }
+  return testableLabels;
+}
+
+function randomArrayItem(items) {
+  if (globalThis.crypto?.getRandomValues) {
+    const value = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(value);
+    return items[value[0] % items.length];
+  }
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+async function sendRandomTestWord() {
+  if (requestInFlight || randomTestBusy) return;
+
+  randomTestBusy = true;
+  renderRecognition(recognizer.state());
+  try {
+    const labels = await loadTestableLabels();
+    const word = randomArrayItem(labels);
+    elements.randomTestWord.textContent = `전송한 테스트 단어: ${word}`;
+    await sendSentenceRequest([word], {
+      consumeRecognizedWords: false,
+      markIdleSegment: false,
+      requestLabel: `랜덤 테스트 단어 ‘${word}’`,
+    });
+  } catch (error) {
+    renderGenerationState("error", `통신 테스트 실패 · ${error.message}`);
+    logger.error("랜덤 단어 통신 테스트 실패", error);
+  } finally {
+    randomTestBusy = false;
     renderRecognition(recognizer.state());
   }
 }
@@ -293,6 +368,7 @@ function renderRecognition(state) {
   const hasTokens = state.tokens.length > 0;
   elements.undoTokenButton.disabled = !hasTokens || requestInFlight;
   elements.clearTokensButton.disabled = !hasTokens || requestInFlight;
+  elements.randomTestButton.disabled = requestInFlight || randomTestBusy;
 }
 
 function setStatus(message, state = "idle") {
@@ -432,6 +508,7 @@ elements.clearTokensButton.addEventListener("click", () => {
   elements.generatedSentence.textContent = "아직 생성된 문장이 없습니다.";
   logger.info("확정 단어 전체 지우기");
 });
+elements.randomTestButton.addEventListener("click", sendRandomTestWord);
 window.addEventListener("scroll", pauseInferenceForScroll, { passive: true });
 document.addEventListener("visibilitychange", handleVisibilityChange);
 window.addEventListener("pagehide", () => {

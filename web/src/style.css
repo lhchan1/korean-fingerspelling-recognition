@@ -443,6 +443,19 @@ p {
   line-height: 1.6;
 }
 
+.connection-test-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.connection-test-row span {
+  color: #7f91a7;
+  font-size: 0.78rem;
+}
+
 .prediction-panel {
   padding: 18px;
   border: 1px solid #26364b;

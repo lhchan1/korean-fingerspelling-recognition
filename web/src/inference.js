@@ -1,7 +1,8 @@
 const MODEL_VERSION = "word-lstm-v7";
 const MODEL_URL = `/public/models/word-sign/model.json?v=${MODEL_VERSION}`;
 const CONFIG_URL = `/public/models/word-sign/config.json?v=${MODEL_VERSION}`;
-const LABELS_URL = `/public/models/word-sign/labels.json?v=${MODEL_VERSION}`;
+export const WORD_SIGN_LABELS_URL =
+  `/public/models/word-sign/labels.json?v=${MODEL_VERSION}`;
 
 export class WordSignInference {
   constructor(onLog) {
@@ -21,7 +22,7 @@ export class WordSignInference {
 
     const [configResponse, labelsResponse] = await Promise.all([
       fetch(CONFIG_URL),
-      fetch(LABELS_URL),
+      fetch(WORD_SIGN_LABELS_URL),
     ]);
     if (!configResponse.ok || !labelsResponse.ok) {
       throw new Error("모델 config 또는 labels 파일을 불러오지 못했습니다.");
