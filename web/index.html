@@ -109,6 +109,22 @@
             </button>
             <span id="randomTestWord">IDLE·OTHER를 제외한 서로 다른 단어 3개를 한 번에 전송합니다.</span>
           </div>
+          <form id="manualWordsForm" class="manual-words-form">
+            <label for="manualWordsInput">직접 입력 통신 테스트</label>
+            <div class="manual-words-controls">
+              <input
+                id="manualWordsInput"
+                type="text"
+                maxlength="300"
+                autocomplete="off"
+                placeholder="예: 나 아프다 머리"
+              />
+              <button id="manualSendButton" class="button button-small" type="submit">
+                입력 단어 배열 전송
+              </button>
+            </div>
+            <span id="manualWordsPreview">띄어쓰기를 기준으로 문자열 배열을 만듭니다.</span>
+          </form>
         </div>
       </section>
 

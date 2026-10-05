@@ -468,6 +468,52 @@ p {
   font-size: 0.78rem;
 }
 
+.manual-words-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #26364b;
+}
+
+.manual-words-form label {
+  color: #cbd8e7;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.manual-words-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.manual-words-controls input {
+  min-width: 0;
+  min-height: 40px;
+  flex: 1 1 auto;
+  padding: 0 12px;
+  border: 1px solid #2b3a4e;
+  border-radius: 9px;
+  color: #e2e8f0;
+  background: #08111f;
+  font: inherit;
+}
+
+.manual-words-controls input:focus {
+  border-color: #60a5fa;
+  outline: 3px solid rgba(96, 165, 250, 0.25);
+}
+
+.manual-words-controls input:disabled {
+  opacity: 0.45;
+}
+
+.manual-words-form > span {
+  color: #7f91a7;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
 .prediction-panel {
   padding: 18px;
   border: 1px solid #26364b;
@@ -546,6 +592,11 @@ p {
 
   .recognized-actions .button {
     flex: 1 1 auto;
+  }
+
+  .manual-words-controls {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

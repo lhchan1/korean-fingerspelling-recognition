@@ -40,6 +40,10 @@ const elements = {
   generatedSentence: document.querySelector("#generatedSentence"),
   randomTestButton: document.querySelector("#randomTestButton"),
   randomTestWord: document.querySelector("#randomTestWord"),
+  manualWordsForm: document.querySelector("#manualWordsForm"),
+  manualWordsInput: document.querySelector("#manualWordsInput"),
+  manualSendButton: document.querySelector("#manualSendButton"),
+  manualWordsPreview: document.querySelector("#manualWordsPreview"),
 };
 
 const camera = new CameraController(elements.video);
@@ -167,6 +171,8 @@ async function sendSentenceRequest(
     consumeRecognizedWords = true,
     markIdleSegment = true,
     requestLabel = "인식 단어",
+    nonRecognitionStatusLabel = "통신 테스트",
+    requestMode = null,
   } = {},
 ) {
   if (requestInFlight || (markIdleSegment && idleSegmentConsumed)) {
@@ -193,14 +199,15 @@ async function sendSentenceRequest(
   }
 
   const sentWords = words.map((word) => word.trim());
-  const requestMode = consumeRecognizedWords ? "recognition-batch" : "random-test";
+  const resolvedRequestMode =
+    requestMode ?? (consumeRecognizedWords ? "recognition-batch" : "test");
   requestInFlight = true;
   if (markIdleSegment) idleSegmentConsumed = true;
   sentenceCollector.reset();
   renderRecognition(recognizer.state());
   logger.info("KoBART 전송 직전 words 배열", {
     url: KOBART_WEBSOCKET_URL,
-    mode: requestMode,
+    mode: resolvedRequestMode,
     requestLabel,
     wordCount: sentWords.length,
     words: sentWords,
@@ -249,7 +256,7 @@ async function sendSentenceRequest(
       sentenceCollector.state(),
       consumeRecognizedWords
         ? "전송 완료 · 새 수어 동작을 기다립니다."
-        : "랜덤 3단어 통신 테스트 완료",
+        : `${nonRecognitionStatusLabel} 완료`,
     );
     logger.info("KoBART 문장 생성 성공", {
       session_id: response.sessionId,
@@ -263,7 +270,7 @@ async function sendSentenceRequest(
       sentenceCollector.state(),
       consumeRecognizedWords
         ? "전송 실패 · 새 수어 동작 후 다시 시도합니다."
-        : "랜덤 3단어 통신 테스트 실패",
+        : `${nonRecognitionStatusLabel} 실패`,
       "error",
     );
     logger.error("KoBART 문장 생성 실패", error);
@@ -323,6 +330,8 @@ async function sendRandomTestWords() {
       consumeRecognizedWords: false,
       markIdleSegment: false,
       requestLabel: `랜덤 테스트 3단어 ‘${words.join(", ")}’`,
+      nonRecognitionStatusLabel: "랜덤 3단어 통신 테스트",
+      requestMode: "random-test",
     });
   } catch (error) {
     renderGenerationState("error", `통신 테스트 실패 · ${error.message}`);
@@ -331,6 +340,33 @@ async function sendRandomTestWords() {
     randomTestBusy = false;
     renderRecognition(recognizer.state());
   }
+}
+
+function parseManualWords(value) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed.split(/\s+/u) : [];
+}
+
+async function sendManualTestWords(event) {
+  event.preventDefault();
+  if (requestInFlight || randomTestBusy) return;
+
+  const words = parseManualWords(elements.manualWordsInput.value);
+  if (words.length === 0) {
+    elements.manualWordsPreview.textContent = "전송할 단어를 띄어쓰기로 입력해주세요.";
+    renderGenerationState("error", "직접 입력할 단어가 없습니다.");
+    elements.manualWordsInput.focus();
+    return;
+  }
+
+  elements.manualWordsPreview.textContent = `전송 배열: ${JSON.stringify(words)}`;
+  await sendSentenceRequest(words, {
+    consumeRecognizedWords: false,
+    markIdleSegment: false,
+    requestLabel: `직접 입력 ${words.length}단어`,
+    nonRecognitionStatusLabel: "직접 입력 통신 테스트",
+    requestMode: "manual-test",
+  });
 }
 
 function renderSentenceState(state, message = null, messageState = "ready") {
@@ -387,6 +423,8 @@ function renderRecognition(state) {
   elements.undoTokenButton.disabled = !hasTokens || requestInFlight;
   elements.clearTokensButton.disabled = !hasTokens || requestInFlight;
   elements.randomTestButton.disabled = requestInFlight || randomTestBusy;
+  elements.manualWordsInput.disabled = requestInFlight || randomTestBusy;
+  elements.manualSendButton.disabled = requestInFlight || randomTestBusy;
 }
 
 function setStatus(message, state = "idle") {
@@ -526,6 +564,7 @@ elements.clearTokensButton.addEventListener("click", () => {
   logger.info("확정 단어 전체 지우기");
 });
 elements.randomTestButton.addEventListener("click", sendRandomTestWords);
+elements.manualWordsForm.addEventListener("submit", sendManualTestWords);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 window.addEventListener("pagehide", () => {
   handLandmarker.dispose();
