@@ -52,9 +52,7 @@ let requestInFlight = false;
 let idleSegmentConsumed = false;
 let randomTestBusy = false;
 let testableLabels = null;
-let lastFeatureTimestamp = null;
-let scrollPaused = false;
-let scrollResumeTimer = null;
+let visibilityPaused = false;
 const handLandmarker = new BrowserHandLandmarker(
   elements.video,
   elements.landmarkCanvas,
@@ -63,12 +61,8 @@ const handLandmarker = new BrowserHandLandmarker(
     elements.poseState.textContent = poseDetected ? "검출" : "미검출";
     elements.featureState.textContent = `${poseDetected ? features.length : 0} / 146`;
     elements.inferenceFps.textContent = `${fps.toFixed(1)} FPS`;
-    if (!features.length || !poseDetected || scrollPaused || predictionBusy) return;
+    if (!features.length || !poseDetected || visibilityPaused || predictionBusy) return;
 
-    if (lastFeatureTimestamp !== null && timestamp - lastFeatureTimestamp > 500) {
-      resetTemporalInference("프레임 처리 간격이 길어져 추론 버퍼를 초기화했습니다.");
-    }
-    lastFeatureTimestamp = timestamp;
     predictionBusy = true;
     try {
       const state = await inference.addFrame(features, timestamp);
@@ -85,43 +79,17 @@ let modelReady = false;
 
 function resetTemporalInference(logMessage = null) {
   inference.reset();
-  lastFeatureTimestamp = null;
   renderRecognition(recognizer.resetWindow());
   renderSentenceState(sentenceCollector.reset());
   renderPrediction({ size: 0, progress: 0 });
   if (logMessage) logger.info(logMessage);
 }
 
-function pauseInferenceForScroll() {
-  if (!camera.isRunning || !modelReady) return;
-
-  if (!scrollPaused) {
-    scrollPaused = true;
-    handLandmarker.stop();
-    resetTemporalInference("화면 스크롤 감지 · 추론을 잠시 중지합니다.");
-  }
-
-  clearTimeout(scrollResumeTimer);
-  scrollResumeTimer = setTimeout(async () => {
-    if (!camera.isRunning || document.hidden) return;
-    try {
-      await elements.video.play();
-      scrollPaused = false;
-      handLandmarker.start();
-      setStatus("스크롤 종료 · 특징을 처음부터 다시 수집합니다.", "success");
-    } catch (error) {
-      logger.error("스크롤 후 카메라 재개 실패", error);
-      setStatus("카메라 재개에 실패했습니다. 카메라를 다시 시작해주세요.", "error");
-    }
-  }, 350);
-}
-
 async function handleVisibilityChange() {
   if (!camera.isRunning || !modelReady) return;
 
   if (document.hidden) {
-    clearTimeout(scrollResumeTimer);
-    scrollPaused = true;
+    visibilityPaused = true;
     handLandmarker.stop();
     resetTemporalInference("페이지가 가려져 추론을 중지했습니다.");
     return;
@@ -129,7 +97,7 @@ async function handleVisibilityChange() {
 
   try {
     await elements.video.play();
-    scrollPaused = false;
+    visibilityPaused = false;
     handLandmarker.start();
     setStatus("카메라 추론을 다시 시작했습니다.", "success");
   } catch (error) {
@@ -281,7 +249,7 @@ async function sendSentenceRequest(
       sentenceCollector.state(),
       consumeRecognizedWords
         ? "전송 완료 · 새 수어 동작을 기다립니다."
-        : "랜덤 단어 통신 테스트 완료",
+        : "랜덤 3단어 통신 테스트 완료",
     );
     logger.info("KoBART 문장 생성 성공", {
       session_id: response.sessionId,
@@ -295,7 +263,7 @@ async function sendSentenceRequest(
       sentenceCollector.state(),
       consumeRecognizedWords
         ? "전송 실패 · 새 수어 동작 후 다시 시도합니다."
-        : "랜덤 단어 통신 테스트 실패",
+        : "랜덤 3단어 통신 테스트 실패",
       "error",
     );
     logger.error("KoBART 문장 생성 실패", error);
@@ -323,32 +291,42 @@ async function loadTestableLabels() {
   return testableLabels;
 }
 
-function randomArrayItem(items) {
+function randomArrayIndex(length) {
   if (globalThis.crypto?.getRandomValues) {
     const value = new Uint32Array(1);
     globalThis.crypto.getRandomValues(value);
-    return items[value[0] % items.length];
+    return value[0] % length;
   }
-  return items[Math.floor(Math.random() * items.length)];
+  return Math.floor(Math.random() * length);
 }
 
-async function sendRandomTestWord() {
+function randomArrayItems(items, count) {
+  const pool = [...items];
+  const selected = [];
+  while (selected.length < count && pool.length > 0) {
+    const index = randomArrayIndex(pool.length);
+    selected.push(pool.splice(index, 1)[0]);
+  }
+  return selected;
+}
+
+async function sendRandomTestWords() {
   if (requestInFlight || randomTestBusy) return;
 
   randomTestBusy = true;
   renderRecognition(recognizer.state());
   try {
     const labels = await loadTestableLabels();
-    const word = randomArrayItem(labels);
-    elements.randomTestWord.textContent = `전송한 테스트 단어: ${word}`;
-    await sendSentenceRequest([word], {
+    const words = randomArrayItems(labels, 3);
+    elements.randomTestWord.textContent = `전송한 테스트 단어: ${words.join(" → ")}`;
+    await sendSentenceRequest(words, {
       consumeRecognizedWords: false,
       markIdleSegment: false,
-      requestLabel: `랜덤 테스트 단어 ‘${word}’`,
+      requestLabel: `랜덤 테스트 3단어 ‘${words.join(", ")}’`,
     });
   } catch (error) {
     renderGenerationState("error", `통신 테스트 실패 · ${error.message}`);
-    logger.error("랜덤 단어 통신 테스트 실패", error);
+    logger.error("랜덤 3단어 통신 테스트 실패", error);
   } finally {
     randomTestBusy = false;
     renderRecognition(recognizer.state());
@@ -518,8 +496,7 @@ function stopCamera() {
   logger.info("카메라 종료");
   handLandmarker.stop();
   camera.stop();
-  clearTimeout(scrollResumeTimer);
-  scrollPaused = false;
+  visibilityPaused = false;
   idleSegmentConsumed = false;
   resetTemporalInference();
   renderCameraState();
@@ -548,11 +525,9 @@ elements.clearTokensButton.addEventListener("click", () => {
   elements.generatedSentence.textContent = "아직 생성된 문장이 없습니다.";
   logger.info("확정 단어 전체 지우기");
 });
-elements.randomTestButton.addEventListener("click", sendRandomTestWord);
-window.addEventListener("scroll", pauseInferenceForScroll, { passive: true });
+elements.randomTestButton.addEventListener("click", sendRandomTestWords);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 window.addEventListener("pagehide", () => {
-  clearTimeout(scrollResumeTimer);
   handLandmarker.dispose();
   camera.stop();
 });
