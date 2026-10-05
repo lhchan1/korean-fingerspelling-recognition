@@ -2,6 +2,10 @@ import { CameraController, cameraErrorMessage } from "./camera.js";
 import { BrowserHandLandmarker } from "./hand-landmarker.js";
 import { DebugLogger } from "./debug-log.js";
 import { WordSignInference } from "./inference.js";
+import {
+  KOBART_WEBSOCKET_URL,
+  requestKoreanSentence,
+} from "./kobart-client.js";
 import { IdleSentenceCollector, RecognitionStabilizer } from "./recognition.js";
 
 const elements = {
@@ -32,7 +36,8 @@ const elements = {
   undoTokenButton: document.querySelector("#undoTokenButton"),
   clearTokensButton: document.querySelector("#clearTokensButton"),
   idleState: document.querySelector("#idleState"),
-  pendingPayload: document.querySelector("#pendingPayload"),
+  generationState: document.querySelector("#generationState"),
+  generatedSentence: document.querySelector("#generatedSentence"),
 };
 
 const camera = new CameraController(elements.video);
@@ -41,7 +46,8 @@ const inference = new WordSignInference((message, detail) => logger.info(message
 const recognizer = new RecognitionStabilizer();
 const sentenceCollector = new IdleSentenceCollector({ idleDurationMs: 3000 });
 let predictionBusy = false;
-let sentenceReadyForServer = false;
+let requestInFlight = false;
+let idleSegmentConsumed = false;
 let lastFeatureTimestamp = null;
 let scrollPaused = false;
 let scrollResumeTimer = null;
@@ -152,27 +158,86 @@ function renderPrediction(state) {
   const recognitionState = recognizer.push(state.prediction);
   renderRecognition(recognitionState);
   if (recognitionState.added) {
-    sentenceReadyForServer = false;
+    idleSegmentConsumed = false;
+    sentenceCollector.reset();
+    if (!requestInFlight) {
+      renderGenerationState("collecting", "새 단어를 확정했습니다.");
+    }
     logger.info("단어 확정", {
       label: recognitionState.added,
       tokens: recognitionState.tokens,
     });
   }
 
+  if (recognitionState.stableLabel && recognitionState.stableLabel !== "IDLE") {
+    idleSegmentConsumed = false;
+  }
+
+  if (requestInFlight) return;
+  if (idleSegmentConsumed) {
+    sentenceCollector.reset();
+    renderSentenceState(sentenceCollector.state(), "새 수어 동작을 기다립니다.");
+    return;
+  }
+
   const sentenceState = sentenceCollector.update(recognitionState);
   renderSentenceState(sentenceState);
-  if (sentenceState.ready) finalizeSentence(sentenceState.payload);
+  if (sentenceState.ready) sendSentenceRequest(sentenceState.payload.words);
 }
 
-function finalizeSentence(payload) {
-  // 서버 API가 정해지면 이 함수 안에서 payload를 fetch로 전송합니다.
-  elements.pendingPayload.textContent = JSON.stringify(payload, null, 2);
-  logger.info("문장 전송 준비 완료", payload);
-  window.dispatchEvent(new CustomEvent("sentence-ready", { detail: payload }));
-  sentenceReadyForServer = true;
+async function sendSentenceRequest(words) {
+  if (requestInFlight || idleSegmentConsumed || words.length === 0) return;
 
-  renderRecognition(recognizer.clear());
-  renderSentenceState(sentenceCollector.reset(), "전송 대기 데이터 생성 완료");
+  const sentWords = [...words];
+  requestInFlight = true;
+  idleSegmentConsumed = true;
+  sentenceCollector.reset();
+  renderRecognition(recognizer.state());
+  logger.info("KoBART 문장 생성 요청 시작", {
+    url: KOBART_WEBSOCKET_URL,
+    words: sentWords,
+  });
+
+  try {
+    const response = await requestKoreanSentence(sentWords, {
+      onStateChange(state, detail) {
+        if (state === "connecting") {
+          renderGenerationState("connecting", "KoBART 서버에 연결 중입니다…");
+          renderSentenceState(sentenceCollector.state(), "서버 연결 중");
+        } else if (state === "processing") {
+          renderGenerationState("processing", "서버에서 한국어 문장을 생성 중입니다…");
+          renderSentenceState(sentenceCollector.state(), "문장 생성 처리 중");
+          logger.info("KoBART 요청 전송 완료", {
+            session_id: detail.session_id,
+            words: detail.words,
+          });
+        }
+      },
+    });
+
+    const recognitionState = recognizer.consumePrefix(sentWords);
+    if (!recognitionState.consumed) {
+      throw new Error("전송한 단어와 현재 단어 목록이 달라 결과를 적용하지 않았습니다.");
+    }
+
+    elements.generatedSentence.textContent = response.sentence;
+    renderGenerationState("success", "한국어 문장 생성이 완료되었습니다.");
+    renderRecognition(recognitionState);
+    renderSentenceState(sentenceCollector.state(), "전송 완료 · 새 수어 동작을 기다립니다.");
+    logger.info("KoBART 문장 생성 성공", {
+      session_id: response.sessionId,
+      sentence: response.sentence,
+      remainingTokens: recognitionState.tokens,
+    });
+  } catch (error) {
+    renderGenerationState("error", `문장 생성 실패 · ${error.message}`);
+    renderRecognition(recognizer.state());
+    renderSentenceState(sentenceCollector.state(), "전송 실패 · 새 수어 동작 후 다시 시도합니다.");
+    logger.error("KoBART 문장 생성 실패", error);
+  } finally {
+    requestInFlight = false;
+    renderRecognition(recognizer.state());
+  }
 }
 
 function renderSentenceState(state, message = null) {
@@ -182,19 +247,23 @@ function renderSentenceState(state, message = null) {
     return;
   }
   if (!state.active) {
-    if (sentenceReadyForServer) {
-      elements.idleState.textContent = "전송 대기 데이터 생성 완료";
-      elements.idleState.dataset.state = "ready";
-      return;
-    }
     elements.idleState.textContent = "단어 입력 후 IDLE 3초를 기다립니다.";
     elements.idleState.dataset.state = "waiting";
+    if (!requestInFlight && !idleSegmentConsumed) {
+      renderGenerationState("collecting", "수어 단어를 모으는 중입니다.");
+    }
     return;
   }
 
   elements.idleState.textContent =
-    `IDLE 유지 중 · ${(state.remainingMs / 1000).toFixed(1)}초 후 자동 확정`;
+    `IDLE 유지 중 · ${(state.remainingMs / 1000).toFixed(1)}초 후 자동 전송`;
   elements.idleState.dataset.state = "counting";
+  renderGenerationState("idle-countdown", "IDLE 3초를 확인하고 있습니다.");
+}
+
+function renderGenerationState(state, message) {
+  elements.generationState.dataset.state = state;
+  elements.generationState.textContent = message;
 }
 
 function renderRecognition(state) {
@@ -222,8 +291,8 @@ function renderRecognition(state) {
   }
 
   const hasTokens = state.tokens.length > 0;
-  elements.undoTokenButton.disabled = !hasTokens;
-  elements.clearTokensButton.disabled = !hasTokens;
+  elements.undoTokenButton.disabled = !hasTokens || requestInFlight;
+  elements.clearTokensButton.disabled = !hasTokens || requestInFlight;
 }
 
 function setStatus(message, state = "idle") {
@@ -335,7 +404,7 @@ function stopCamera() {
   camera.stop();
   clearTimeout(scrollResumeTimer);
   scrollPaused = false;
-  sentenceReadyForServer = false;
+  idleSegmentConsumed = false;
   resetTemporalInference();
   renderCameraState();
   setStatus("카메라를 종료했습니다.", "idle");
@@ -346,18 +415,21 @@ elements.switchButton.addEventListener("click", switchCamera);
 elements.stopButton.addEventListener("click", stopCamera);
 elements.clearLogButton.addEventListener("click", () => logger.clear());
 elements.undoTokenButton.addEventListener("click", () => {
+  if (requestInFlight) return;
   sentenceCollector.reset();
-  sentenceReadyForServer = false;
+  idleSegmentConsumed = false;
   const state = recognizer.undo();
   renderRecognition(state);
   renderSentenceState(sentenceCollector.state());
   logger.info("마지막 확정 단어 취소", { removed: state.removed, tokens: state.tokens });
 });
 elements.clearTokensButton.addEventListener("click", () => {
+  if (requestInFlight) return;
   sentenceCollector.reset();
-  sentenceReadyForServer = false;
+  idleSegmentConsumed = false;
   renderRecognition(recognizer.clear());
   renderSentenceState(sentenceCollector.state());
+  elements.generatedSentence.textContent = "아직 생성된 문장이 없습니다.";
   logger.info("확정 단어 전체 지우기");
 });
 window.addEventListener("scroll", pauseInferenceForScroll, { passive: true });

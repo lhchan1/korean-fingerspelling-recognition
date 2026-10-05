@@ -54,6 +54,17 @@
           throw new Error("empty sentence was emitted");
         }
 
+        recognizer.clear();
+        recognizer.tokens.push("어제", "기침", "새단어");
+        const consumed = recognizer.consumePrefix(["어제", "기침"]);
+        if (!consumed.consumed || consumed.tokens.join(",") !== "새단어") {
+          throw new Error("sent prefix consumption failed");
+        }
+        const mismatch = recognizer.consumePrefix(["없는단어"]);
+        if (mismatch.consumed || mismatch.tokens.join(",") !== "새단어") {
+          throw new Error("mismatched prefix was removed");
+        }
+
         result.textContent = JSON.stringify({ status: "PASS", payload: ready.payload });
       } catch (error) {
         result.textContent = JSON.stringify({ status: "FAIL", error: error.message });

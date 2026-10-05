@@ -62,6 +62,18 @@ export class RecognitionStabilizer {
     return this.state();
   }
 
+  consumePrefix(expectedTokens) {
+    const expected = Array.isArray(expectedTokens) ? expectedTokens : [];
+    const matches =
+      expected.length > 0 &&
+      expected.length <= this.tokens.length &&
+      expected.every((token, index) => this.tokens[index] === token);
+
+    if (!matches) return this.state({ consumed: false });
+    this.tokens.splice(0, expected.length);
+    return this.state({ consumed: true, consumedTokens: [...expected] });
+  }
+
   resetWindow() {
     this.recent = [];
     this.armed = true;

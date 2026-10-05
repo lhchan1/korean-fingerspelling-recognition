@@ -395,7 +395,8 @@ p {
 }
 
 .idle-state,
-.payload-label {
+.generation-state,
+.sentence-label {
   margin: 0;
   color: #8fa3ba;
   font-size: 0.82rem;
@@ -405,25 +406,41 @@ p {
   color: #fcd56b;
 }
 
-.idle-state[data-state="ready"] {
+.idle-state[data-state="ready"],
+.generation-state[data-state="success"] {
   color: #91f1b4;
 }
 
-.payload-label {
+.generation-state {
+  margin-top: 8px;
+}
+
+.generation-state[data-state="idle-countdown"] {
+  color: #fcd56b;
+}
+
+.generation-state[data-state="connecting"],
+.generation-state[data-state="processing"] {
+  color: #93c5fd;
+}
+
+.generation-state[data-state="error"] {
+  color: #fda4af;
+}
+
+.sentence-label {
   margin-top: 12px;
   font-weight: 750;
 }
 
-.pending-payload {
-  overflow: auto;
-  max-height: 150px;
+.generated-sentence {
   margin: 8px 0 0;
   padding: 11px;
   border-radius: 9px;
-  color: #a7f3d0;
+  color: #e2e8f0;
   background: #02050a;
-  font: 12px/1.55 "SFMono-Regular", Consolas, monospace;
-  white-space: pre-wrap;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .prediction-panel {

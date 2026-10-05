@@ -25,11 +25,19 @@
 - IDLE/OTHER 전환 기반 동일 동작 중복 방지
 - 확정 단어 누적, 마지막 단어 취소, 전체 지우기
 - 확정 단어가 있는 상태에서 IDLE이 3초 유지되면 문장을 자동 확정
-- 서버 연동 전 단계로 `{ words, clientCreatedAt, source }` JSON payload 생성
+- 고정 WSS 주소의 KoBART FastAPI 서버로 확정 단어 배열만 자동 전송
+- 연결·처리 중 중복 요청 방지 및 전체 요청 30초 제한
+- 성공 응답의 `session_id`, `type`, `sentence` 검증 후 생성 문장 표시
+- 성공 시 전송한 단어만 제거하고 처리 중 새로 인식한 단어는 보존
+- 실패 시 단어를 유지하며 같은 IDLE 구간에서 자동 재시도하지 않음
 - 모바일에서는 MediaPipe CPU delegate와 640×480 카메라를 사용해 WebGL 호환성을 확보
 - MediaPipe 프레임 오류가 발생해도 검출 루프를 유지하고 화면 로그에 원인 표시
 
-카메라 영상은 서버로 전송하지 않습니다.
+카메라 영상·이미지·랜드마크 좌표·146차원 특징 벡터는 서버로 전송하지 않습니다.
+서버에는 `{ session_id, words }` 형식의 텍스트 JSON만 전송합니다.
+
+KoBART WebSocket 주소는 `src/kobart-client.js`의
+`KOBART_WEBSOCKET_URL` 상수에서 변경할 수 있습니다.
 
 ## 실행 구조
 
@@ -79,9 +87,10 @@ Build output directory: .
 TensorFlow.js 4.22 번들이 런타임에 동적 함수를 생성하므로 `script-src`에는
 `'unsafe-eval'`이 포함됩니다. 외부 스크립트 출처는 허용하지 않고 `'self'`만 유지합니다.
 
+`_headers`의 CSP `connect-src`에는
+`wss://sign-kobart.duckdns.org`만 KoBART 연결 대상으로 허용합니다.
 배포 전에 비밀정보 검사를 다시 실행하고, API 키는 절대로 이 정적 폴더에
-저장하지 않습니다. 향후 LLM을 연결할 때는 Cloudflare Worker 같은 서버 함수에
-키를 비밀 변수로 보관하고 확정된 단어만 전송해야 합니다.
+저장하지 않습니다.
 
 ## 디렉터리 구조
 
@@ -94,6 +103,7 @@ capstone-web/
 │       └── word-sign/    # v7 TensorFlow.js 모델과 가중치
 ├── src/
 │   ├── camera.js         # 카메라 생명주기와 오류 처리
+│   ├── kobart-client.js  # KoBART WebSocket 요청·응답 검증
 │   ├── main.js           # 화면 상태와 이벤트 연결
 │   ├── recognition.js    # 예측 안정화와 단어 확정
 │   └── style.css
@@ -101,8 +111,11 @@ capstone-web/
 └── README.md
 ```
 
-## 다음 작업
+## KoBART 서버 연결 동작
 
-1. 실제 수어 영상으로 임계값과 안정화 횟수 조정
-2. 모바일 성능과 정확도 검증
-3. `sentence-ready` 이벤트의 payload를 보안 처리된 문장 생성 API로 전송
+확정 단어가 하나 이상인 상태에서 안정적인 `IDLE` 예측이 3초 유지되면 자동으로
+한 번 요청합니다. 문장 완성 버튼은 사용하지 않습니다. 성공했을 때만 그 요청에
+포함된 단어를 제거하며, 요청 처리 중 추가된 단어는 다음 문장용으로 남깁니다.
+실패한 요청은 같은 IDLE 구간에서 자동 반복하지 않고 새 수어 동작 후 다음 IDLE을
+기다립니다. VM이 꺼져 있거나 시작 직후라면 연결 실패할 수 있으므로 서버 모델
+로딩과 DNS 갱신이 끝난 뒤 다시 동작을 입력합니다.
