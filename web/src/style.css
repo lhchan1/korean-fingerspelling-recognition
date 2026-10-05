@@ -411,6 +411,15 @@ p {
   color: #91f1b4;
 }
 
+.idle-state[data-state="connecting"],
+.idle-state[data-state="processing"] {
+  color: #93c5fd;
+}
+
+.idle-state[data-state="error"] {
+  color: #fda4af;
+}
+
 .generation-state {
   margin-top: 8px;
 }
@@ -434,6 +443,8 @@ p {
 }
 
 .generated-sentence {
+  overflow: auto;
+  max-height: 9.6em;
   margin: 8px 0 0;
   padding: 11px;
   border-radius: 9px;
@@ -441,6 +452,7 @@ p {
   background: #02050a;
   font-size: 0.95rem;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .connection-test-row {

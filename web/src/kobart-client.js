@@ -18,12 +18,14 @@ export function requestKoreanSentence(
     onStateChange = () => {},
   } = {},
 ) {
-  const requestWords = Array.isArray(words)
-    ? words.filter((word) => typeof word === "string" && word.trim())
-    : [];
-  if (requestWords.length === 0) {
+  if (!Array.isArray(words) || words.length === 0) {
     return Promise.reject(new Error("전송할 단어가 없습니다."));
   }
+  if (words.some((word) => typeof word !== "string" || !word.trim())) {
+    return Promise.reject(new Error("words는 비어 있지 않은 문자열 배열이어야 합니다."));
+  }
+
+  const requestWords = words.map((word) => word.trim());
 
   const sessionId = createSessionId();
 

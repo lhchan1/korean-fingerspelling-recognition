@@ -38,6 +38,20 @@
         }
         recognizer.clear();
 
+        const expectedSentence = ["어제", "기침", "콧물", "열", "가래", "있다"];
+        for (const word of expectedSentence) {
+          for (let vote = 0; vote < 5; vote += 1) {
+            recognizer.push({ label: word, confidence: 0.9 });
+          }
+          for (let vote = 0; vote < 5; vote += 1) {
+            recognizer.push({ label: "IDLE", confidence: 0.9 });
+          }
+        }
+        if (recognizer.state().tokens.join(",") !== expectedSentence.join(",")) {
+          throw new Error(`multiword accumulation failed: ${recognizer.state().tokens}`);
+        }
+        recognizer.clear();
+
         const collector = new IdleSentenceCollector({ idleDurationMs: 3000 });
         const idleState = { stableLabel: "IDLE", tokens: ["나", "아프다"] };
         if (collector.update(idleState, 1000).ready) throw new Error("idle completed early");

@@ -180,7 +180,11 @@ function renderPrediction(state) {
   if (requestInFlight) return;
   if (idleSegmentConsumed) {
     sentenceCollector.reset();
-    renderSentenceState(sentenceCollector.state(), "새 수어 동작을 기다립니다.");
+    renderSentenceState(
+      sentenceCollector.state(),
+      "새 수어 동작을 기다립니다.",
+      "waiting",
+    );
     return;
   }
 
@@ -197,18 +201,40 @@ async function sendSentenceRequest(
     requestLabel = "인식 단어",
   } = {},
 ) {
-  if (requestInFlight || (markIdleSegment && idleSegmentConsumed) || words.length === 0) {
+  if (requestInFlight || (markIdleSegment && idleSegmentConsumed)) {
     return;
   }
 
-  const sentWords = [...words];
+  const invalidWords =
+    !Array.isArray(words) ||
+    words.length === 0 ||
+    words.some(
+      (word) =>
+        typeof word !== "string" ||
+        !word.trim() ||
+        word.trim() === "IDLE" ||
+        word.trim() === "OTHER",
+    );
+  if (invalidWords) {
+    const error = new Error(
+      "전송 단어는 IDLE·OTHER를 제외한 비어 있지 않은 문자열 배열이어야 합니다.",
+    );
+    renderGenerationState("error", `문장 생성 실패 · ${error.message}`);
+    logger.error("KoBART 전송 데이터 검증 실패", error);
+    return;
+  }
+
+  const sentWords = words.map((word) => word.trim());
+  const requestMode = consumeRecognizedWords ? "recognition-batch" : "random-test";
   requestInFlight = true;
   if (markIdleSegment) idleSegmentConsumed = true;
   sentenceCollector.reset();
   renderRecognition(recognizer.state());
-  logger.info("KoBART 문장 생성 요청 시작", {
+  logger.info("KoBART 전송 직전 words 배열", {
     url: KOBART_WEBSOCKET_URL,
+    mode: requestMode,
     requestLabel,
+    wordCount: sentWords.length,
     words: sentWords,
   });
 
@@ -217,10 +243,18 @@ async function sendSentenceRequest(
       onStateChange(state, detail) {
         if (state === "connecting") {
           renderGenerationState("connecting", "KoBART 서버에 연결 중입니다…");
-          renderSentenceState(sentenceCollector.state(), "서버 연결 중");
+          renderSentenceState(
+            sentenceCollector.state(),
+            "서버 연결 중",
+            "connecting",
+          );
         } else if (state === "processing") {
           renderGenerationState("processing", "서버에서 한국어 문장을 생성 중입니다…");
-          renderSentenceState(sentenceCollector.state(), "문장 생성 처리 중");
+          renderSentenceState(
+            sentenceCollector.state(),
+            "문장 생성 처리 중",
+            "processing",
+          );
           logger.info("KoBART 요청 전송 완료", {
             session_id: detail.session_id,
             words: detail.words,
@@ -257,7 +291,13 @@ async function sendSentenceRequest(
   } catch (error) {
     renderGenerationState("error", `문장 생성 실패 · ${error.message}`);
     renderRecognition(recognizer.state());
-    renderSentenceState(sentenceCollector.state(), "전송 실패 · 새 수어 동작 후 다시 시도합니다.");
+    renderSentenceState(
+      sentenceCollector.state(),
+      consumeRecognizedWords
+        ? "전송 실패 · 새 수어 동작 후 다시 시도합니다."
+        : "랜덤 단어 통신 테스트 실패",
+      "error",
+    );
     logger.error("KoBART 문장 생성 실패", error);
   } finally {
     requestInFlight = false;
@@ -315,10 +355,10 @@ async function sendRandomTestWord() {
   }
 }
 
-function renderSentenceState(state, message = null) {
+function renderSentenceState(state, message = null, messageState = "ready") {
   if (message) {
     elements.idleState.textContent = message;
-    elements.idleState.dataset.state = "ready";
+    elements.idleState.dataset.state = messageState;
     return;
   }
   if (!state.active) {
