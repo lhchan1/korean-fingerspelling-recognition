@@ -19,6 +19,7 @@ body {
     radial-gradient(circle at 15% 0%, rgba(34, 197, 94, 0.15), transparent 32rem),
     radial-gradient(circle at 95% 20%, rgba(59, 130, 246, 0.12), transparent 28rem),
     #060b13;
+  overscroll-behavior-y: none;
 }
 
 button,
@@ -102,6 +103,9 @@ p {
 
 .camera-card {
   padding: 12px;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  isolation: isolate;
 }
 
 .camera-stage {
@@ -120,6 +124,9 @@ p {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .camera-stage canvas {
@@ -129,7 +136,7 @@ p {
 
 .camera-stage.is-mirrored video,
 .camera-stage.is-mirrored canvas {
-  transform: scaleX(-1);
+  transform: translateZ(0) scaleX(-1);
 }
 
 .camera-stage.is-empty video,

@@ -42,15 +42,23 @@ const recognizer = new RecognitionStabilizer();
 const sentenceCollector = new IdleSentenceCollector({ idleDurationMs: 3000 });
 let predictionBusy = false;
 let sentenceReadyForServer = false;
+let lastFeatureTimestamp = null;
+let scrollPaused = false;
+let scrollResumeTimer = null;
 const handLandmarker = new BrowserHandLandmarker(
   elements.video,
   elements.landmarkCanvas,
   async ({ handCount, poseDetected = false, features = [], fps, timestamp }) => {
     elements.handCount.textContent = String(handCount);
     elements.poseState.textContent = poseDetected ? "검출" : "미검출";
-    elements.featureState.textContent = `${features.length} / 146`;
+    elements.featureState.textContent = `${poseDetected ? features.length : 0} / 146`;
     elements.inferenceFps.textContent = `${fps.toFixed(1)} FPS`;
-    if (!features.length || predictionBusy) return;
+    if (!features.length || !poseDetected || scrollPaused || predictionBusy) return;
+
+    if (lastFeatureTimestamp !== null && timestamp - lastFeatureTimestamp > 500) {
+      resetTemporalInference("프레임 처리 간격이 길어져 추론 버퍼를 초기화했습니다.");
+    }
+    lastFeatureTimestamp = timestamp;
     predictionBusy = true;
     try {
       const state = await inference.addFrame(features, timestamp);
@@ -64,6 +72,61 @@ const handLandmarker = new BrowserHandLandmarker(
   (message, detail) => logger.info(message, detail),
 );
 let modelReady = false;
+
+function resetTemporalInference(logMessage = null) {
+  inference.reset();
+  lastFeatureTimestamp = null;
+  renderRecognition(recognizer.resetWindow());
+  renderSentenceState(sentenceCollector.reset());
+  renderPrediction({ size: 0, progress: 0 });
+  if (logMessage) logger.info(logMessage);
+}
+
+function pauseInferenceForScroll() {
+  if (!camera.isRunning || !modelReady) return;
+
+  if (!scrollPaused) {
+    scrollPaused = true;
+    handLandmarker.stop();
+    resetTemporalInference("화면 스크롤 감지 · 추론을 잠시 중지합니다.");
+  }
+
+  clearTimeout(scrollResumeTimer);
+  scrollResumeTimer = setTimeout(async () => {
+    if (!camera.isRunning || document.hidden) return;
+    try {
+      await elements.video.play();
+      scrollPaused = false;
+      handLandmarker.start();
+      setStatus("스크롤 종료 · 특징을 처음부터 다시 수집합니다.", "success");
+    } catch (error) {
+      logger.error("스크롤 후 카메라 재개 실패", error);
+      setStatus("카메라 재개에 실패했습니다. 카메라를 다시 시작해주세요.", "error");
+    }
+  }, 350);
+}
+
+async function handleVisibilityChange() {
+  if (!camera.isRunning || !modelReady) return;
+
+  if (document.hidden) {
+    clearTimeout(scrollResumeTimer);
+    scrollPaused = true;
+    handLandmarker.stop();
+    resetTemporalInference("페이지가 가려져 추론을 중지했습니다.");
+    return;
+  }
+
+  try {
+    await elements.video.play();
+    scrollPaused = false;
+    handLandmarker.start();
+    setStatus("카메라 추론을 다시 시작했습니다.", "success");
+  } catch (error) {
+    logger.error("페이지 복귀 후 카메라 재개 실패", error);
+    setStatus("카메라를 다시 시작해주세요.", "error");
+  }
+}
 
 function renderPrediction(state) {
   const size = state.size ?? 0;
@@ -270,12 +333,10 @@ function stopCamera() {
   logger.info("카메라 종료");
   handLandmarker.stop();
   camera.stop();
-  inference.reset();
-  sentenceCollector.reset();
+  clearTimeout(scrollResumeTimer);
+  scrollPaused = false;
   sentenceReadyForServer = false;
-  renderRecognition(recognizer.resetWindow());
-  renderSentenceState(sentenceCollector.state());
-  renderPrediction({ size: 0, progress: 0 });
+  resetTemporalInference();
   renderCameraState();
   setStatus("카메라를 종료했습니다.", "idle");
 }
@@ -299,7 +360,10 @@ elements.clearTokensButton.addEventListener("click", () => {
   renderSentenceState(sentenceCollector.state());
   logger.info("확정 단어 전체 지우기");
 });
+window.addEventListener("scroll", pauseInferenceForScroll, { passive: true });
+document.addEventListener("visibilitychange", handleVisibilityChange);
 window.addEventListener("pagehide", () => {
+  clearTimeout(scrollResumeTimer);
   handLandmarker.dispose();
   camera.stop();
 });
