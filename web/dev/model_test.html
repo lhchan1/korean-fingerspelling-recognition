@@ -8,7 +8,7 @@
       (async () => {
         const output = document.querySelector("#result");
         try {
-          const model = await tf.loadLayersModel("../public/models/word-sign/model.json?v=word-lstm-v7");
+          const model = await tf.loadLayersModel("../public/models/word-sign/model.json?v=word-lstm-v9-stable-split-seed42");
           const probabilities = tf.tidy(() =>
             Array.from(model.predict(tf.zeros([1, 60, 146], "float32")).dataSync())
           );

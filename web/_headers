@@ -9,7 +9,7 @@
   Content-Type: application/wasm
   Cache-Control: public, max-age=31536000, immutable
 
-/public/models/word-sign/word-lstm-v7.weights.bin
+/public/models/word-sign/word-lstm-v9.weights.bin
   Cache-Control: public, max-age=31536000, immutable
 
 /public/models/word-sign/model.json
