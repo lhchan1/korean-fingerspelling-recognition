@@ -138,6 +138,26 @@ export class CameraController {
     });
   }
 
+  async refreshDisplayLayer() {
+    if (!this.stream) return false;
+    const track = this.stream.getVideoTracks()[0];
+    if (!track || track.readyState !== "live") {
+      throw new Error("VIDEO_STREAM_ENDED");
+    }
+
+    // iOS Safari can keep producing frames while the composited <video> layer
+    // turns black after toolbar/viewport scrolling. Reattach the same live
+    // stream to force WebKit to create a fresh display layer without reopening
+    // the camera device.
+    const stream = this.stream;
+    this.video.srcObject = null;
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    this.video.srcObject = stream;
+    await this.video.play();
+    await this.waitUntilVideoReady(5000);
+    return true;
+  }
+
   async waitUntilVideoReady(timeoutMs = 10000) {
     const ready = () =>
       this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&

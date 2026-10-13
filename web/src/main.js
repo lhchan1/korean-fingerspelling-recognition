@@ -1,8 +1,8 @@
 import {
   CameraController,
   cameraErrorMessage,
-} from "./camera.js?v=20261013-ios-camera-recovery1";
-import { BrowserHandLandmarker } from "./hand-landmarker.js?v=20261013-ios-camera-recovery1";
+} from "./camera.js?v=20261013-ios-camera-recovery2";
+import { BrowserHandLandmarker } from "./hand-landmarker.js?v=20261013-ios-camera-recovery2";
 import { DebugLogger } from "./debug-log.js";
 import { WORD_SIGN_LABELS_URL, WordSignInference } from "./inference.js";
 import {
@@ -65,6 +65,8 @@ let testableLabels = null;
 let visibilityPaused = false;
 let cameraOperationBusy = false;
 let cameraSessionId = 0;
+let cameraWasOffscreen = false;
+let viewportRefreshTimer = null;
 const handLandmarker = new BrowserHandLandmarker(
   elements.video,
   elements.landmarkCanvas,
@@ -192,6 +194,86 @@ async function recoverCameraStream(reason, detail = null) {
     renderCameraState();
   }
 }
+
+async function refreshCameraDisplay(reason) {
+  if (
+    cameraOperationBusy ||
+    !camera.isRunning ||
+    !modelReady ||
+    document.hidden
+  ) {
+    return;
+  }
+
+  const sessionId = ++cameraSessionId;
+  cameraOperationBusy = true;
+  renderCameraState();
+  logger.info("iOS Safari 카메라 표시 레이어 새로고침 시작", { reason });
+
+  try {
+    await camera.refreshDisplayLayer();
+    if (sessionId !== cameraSessionId || !camera.isRunning) return;
+    handLandmarker.stop();
+    resetTemporalInference(
+      "카메라 표시 레이어 갱신으로 추론 버퍼를 초기화합니다.",
+      { preserveRecognitionArm: true },
+    );
+    handLandmarker.start();
+    logger.info("iOS Safari 카메라 표시 레이어 새로고침 완료", {
+      reason,
+      playback: camera.playbackState(),
+    });
+  } catch (error) {
+    if (sessionId !== cameraSessionId) return;
+    logger.error("카메라 표시 레이어 새로고침 실패", error);
+    cameraOperationBusy = false;
+    await recoverCameraStream("display-layer-refresh-failed", {
+      reason,
+      message: error.message,
+    });
+    return;
+  } finally {
+    if (sessionId === cameraSessionId) cameraOperationBusy = false;
+    renderCameraState();
+  }
+}
+
+function scheduleViewportCameraRefresh(reason) {
+  if (!camera.isRunning || document.hidden) return;
+  clearTimeout(viewportRefreshTimer);
+  viewportRefreshTimer = setTimeout(() => {
+    const rect = elements.cameraStage.getBoundingClientRect();
+    const visible = rect.bottom > 0 && rect.top < window.innerHeight;
+    if (visible) refreshCameraDisplay(reason);
+  }, 300);
+}
+
+const cameraVisibilityObserver = new IntersectionObserver(
+  ([entry]) => {
+    if (!entry) return;
+    if (!entry.isIntersecting) {
+      cameraWasOffscreen = true;
+      return;
+    }
+    if (cameraWasOffscreen) {
+      cameraWasOffscreen = false;
+      scheduleViewportCameraRefresh("camera-returned-to-viewport");
+    }
+  },
+  { threshold: 0.05 },
+);
+cameraVisibilityObserver.observe(elements.cameraStage);
+
+window.addEventListener(
+  "scroll",
+  () => scheduleViewportCameraRefresh("scroll-ended"),
+  { passive: true },
+);
+window.visualViewport?.addEventListener(
+  "resize",
+  () => scheduleViewportCameraRefresh("visual-viewport-resized"),
+  { passive: true },
+);
 
 function renderPrediction(state) {
   const size = state.size ?? 0;
@@ -728,6 +810,8 @@ elements.randomTestButton.addEventListener("click", sendRandomTestWords);
 elements.manualWordsForm.addEventListener("submit", sendManualTestWords);
 document.addEventListener("visibilitychange", handleVisibilityChange);
 window.addEventListener("pagehide", () => {
+  clearTimeout(viewportRefreshTimer);
+  cameraVisibilityObserver.disconnect();
   handLandmarker.dispose();
   camera.stop();
 });
