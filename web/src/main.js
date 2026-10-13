@@ -1,8 +1,8 @@
 import {
   CameraController,
   cameraErrorMessage,
-} from "./camera.js?v=20261013-camera-switch-fix1";
-import { BrowserHandLandmarker } from "./hand-landmarker.js?v=20261013-camera-switch-fix1";
+} from "./camera.js?v=20261013-ios-camera-recovery1";
+import { BrowserHandLandmarker } from "./hand-landmarker.js?v=20261013-ios-camera-recovery1";
 import { DebugLogger } from "./debug-log.js";
 import { WORD_SIGN_LABELS_URL, WordSignInference } from "./inference.js";
 import {
@@ -86,8 +86,16 @@ const handLandmarker = new BrowserHandLandmarker(
     }
   },
   (message, detail) => logger.info(message, detail),
+  (detail) => recoverCameraStream("video-frame-stalled", detail),
 );
 let modelReady = false;
+
+camera.setEventListener((eventName, detail) => {
+  logger.info(`카메라 미디어 이벤트: ${eventName}`, detail);
+  if (eventName === "video-pause" || eventName === "track-ended") {
+    recoverCameraStream(eventName, detail);
+  }
+});
 
 function resetTemporalInference(
   logMessage = null,
@@ -120,6 +128,68 @@ async function handleVisibilityChange() {
   } catch (error) {
     logger.error("페이지 복귀 후 카메라 재개 실패", error);
     setStatus("카메라를 다시 시작해주세요.", "error");
+  }
+}
+
+async function recoverCameraStream(reason, detail = null) {
+  if (
+    cameraOperationBusy ||
+    !camera.isRunning ||
+    !modelReady ||
+    document.hidden
+  ) {
+    return;
+  }
+
+  const sessionId = ++cameraSessionId;
+  cameraOperationBusy = true;
+  handLandmarker.stop();
+  resetTemporalInference(
+    "카메라 프레임 정지를 감지해 추론 상태를 초기화합니다.",
+    { preserveRecognitionArm: true },
+  );
+  renderCameraState();
+  setStatus("카메라 프레임을 복구하고 있습니다…", "loading");
+  logger.info("카메라 자동 복구 시작", { reason, detail });
+
+  try {
+    let streamReconnected = reason === "track-ended";
+    if (!streamReconnected) {
+      try {
+        await camera.resumePlayback();
+      } catch (resumeError) {
+        streamReconnected = true;
+        logger.info("기존 카메라 재생 복구 실패 · 스트림 재연결 시도", {
+          message: resumeError.message,
+        });
+      }
+    }
+
+    if (streamReconnected) await camera.start();
+    if (sessionId !== cameraSessionId || !camera.isRunning) return;
+
+    await handLandmarker.reinitializeForVideoSource();
+    if (sessionId !== cameraSessionId || !camera.isRunning) return;
+    visibilityPaused = false;
+    handLandmarker.start();
+    logger.info("카메라 자동 복구 완료", {
+      reason,
+      streamReconnected,
+      settings: camera.settings,
+    });
+    setStatus("카메라 프레임과 추론을 다시 시작했습니다.", "success");
+  } catch (error) {
+    if (sessionId !== cameraSessionId) return;
+    logger.error("카메라 자동 복구 실패", error);
+    handLandmarker.stop();
+    camera.stop();
+    setStatus(
+      `카메라 자동 복구에 실패했습니다: ${cameraErrorMessage(error)}`,
+      "error",
+    );
+  } finally {
+    if (sessionId === cameraSessionId) cameraOperationBusy = false;
+    renderCameraState();
   }
 }
 

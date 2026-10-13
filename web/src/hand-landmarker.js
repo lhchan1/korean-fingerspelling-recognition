@@ -33,15 +33,17 @@ function withTimeout(promise, timeoutMs, stage) {
 }
 
 export class BrowserHandLandmarker {
-  constructor(video, canvas, onResult, onLog) {
+  constructor(video, canvas, onResult, onLog, onVideoStall = null) {
     this.video = video;
     this.canvas = canvas;
     this.context = canvas.getContext("2d");
     this.onResult = onResult;
     this.onLog = onLog;
+    this.onVideoStall = onVideoStall;
     this.landmarker = null;
     this.poseLandmarker = null;
     this.animationFrame = null;
+    this.running = false;
     this.lastVideoTime = -1;
     this.frameTimes = [];
     this.lastHandCount = null;
@@ -49,6 +51,8 @@ export class BrowserHandLandmarker {
     this.lastInferenceTime = 0;
     this.lastFrameErrorAt = 0;
     this.sampleIntervalMs = 1000 / 15;
+    this.lastVideoProgressAt = 0;
+    this.videoStallReported = false;
   }
 
   async initialize() {
@@ -143,20 +147,26 @@ export class BrowserHandLandmarker {
   }
 
   start() {
-    if (!this.landmarker || !this.poseLandmarker || this.animationFrame) return;
+    if (!this.landmarker || !this.poseLandmarker || this.running) return;
+    this.running = true;
     this.lastVideoTime = -1;
     this.frameTimes = [];
     this.lastHandCount = null;
     this.lastPoseDetected = null;
     this.lastInferenceTime = 0;
     this.lastFrameErrorAt = 0;
+    this.lastVideoProgressAt = performance.now();
+    this.videoStallReported = false;
     this.predict();
   }
 
   stop() {
+    this.running = false;
     if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
     this.animationFrame = null;
     this.lastVideoTime = -1;
+    this.lastVideoProgressAt = 0;
+    this.videoStallReported = false;
     this.clear();
     this.onResult?.({ handCount: 0, fps: 0 });
   }
@@ -180,11 +190,29 @@ export class BrowserHandLandmarker {
   }
 
   predict = () => {
+    if (!this.running) return;
     try {
       if (this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
         this.resizeCanvas();
 
         const now = performance.now();
+        if (this.video.currentTime !== this.lastVideoTime) {
+          this.lastVideoProgressAt = now;
+          this.videoStallReported = false;
+        } else if (
+          !document.hidden &&
+          !this.video.paused &&
+          this.lastVideoProgressAt > 0 &&
+          now - this.lastVideoProgressAt >= 2000 &&
+          !this.videoStallReported
+        ) {
+          this.videoStallReported = true;
+          this.onVideoStall?.({
+            currentTime: this.video.currentTime,
+            readyState: this.video.readyState,
+            stalledForMs: Math.round(now - this.lastVideoProgressAt),
+          });
+        }
         if (
           this.video.currentTime !== this.lastVideoTime &&
           now - this.lastInferenceTime >= this.sampleIntervalMs
@@ -234,7 +262,9 @@ export class BrowserHandLandmarker {
       }
     }
 
-    this.animationFrame = requestAnimationFrame(this.predict);
+    if (this.running) {
+      this.animationFrame = requestAnimationFrame(this.predict);
+    }
   };
 
   resizeCanvas() {

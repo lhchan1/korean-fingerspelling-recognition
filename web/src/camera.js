@@ -4,6 +4,19 @@ export class CameraController {
     this.stream = null;
     this.facingMode = "user";
     this.settings = null;
+    this.eventListener = null;
+    this.boundTrack = null;
+    this.trackEventHandlers = null;
+
+    for (const eventName of ["playing", "pause", "waiting", "stalled", "emptied"]) {
+      this.video.addEventListener(eventName, () => {
+        this.eventListener?.(`video-${eventName}`, this.playbackState());
+      });
+    }
+  }
+
+  setEventListener(listener) {
+    this.eventListener = listener;
   }
 
   get isRunning() {
@@ -36,6 +49,7 @@ export class CameraController {
     };
 
     this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    this.bindTrackEvents(this.stream.getVideoTracks()[0] ?? null);
     this.video.srcObject = this.stream;
     try {
       await this.video.play();
@@ -49,6 +63,7 @@ export class CameraController {
   }
 
   stop() {
+    this.unbindTrackEvents();
     if (this.stream) {
       this.stream.getTracks().forEach((track) => track.stop());
     }
@@ -57,6 +72,70 @@ export class CameraController {
     this.settings = null;
     this.video.pause();
     this.video.srcObject = null;
+  }
+
+  playbackState() {
+    const track = this.stream?.getVideoTracks?.()[0] ?? null;
+    return {
+      currentTime: this.video.currentTime,
+      paused: this.video.paused,
+      readyState: this.video.readyState,
+      trackMuted: track?.muted ?? null,
+      trackReadyState: track?.readyState ?? null,
+    };
+  }
+
+  bindTrackEvents(track) {
+    this.unbindTrackEvents();
+    if (!track) return;
+    this.boundTrack = track;
+    this.trackEventHandlers = Object.fromEntries(
+      ["mute", "unmute", "ended"].map((eventName) => {
+        const handler = () => {
+          this.eventListener?.(`track-${eventName}`, this.playbackState());
+        };
+        track.addEventListener(eventName, handler);
+        return [eventName, handler];
+      }),
+    );
+  }
+
+  unbindTrackEvents() {
+    if (this.boundTrack && this.trackEventHandlers) {
+      for (const [eventName, handler] of Object.entries(this.trackEventHandlers)) {
+        this.boundTrack.removeEventListener(eventName, handler);
+      }
+    }
+    this.boundTrack = null;
+    this.trackEventHandlers = null;
+  }
+
+  async resumePlayback(timeoutMs = 2500) {
+    if (!this.stream) throw new Error("VIDEO_STREAM_ENDED");
+    const track = this.stream.getVideoTracks()[0];
+    if (!track || track.readyState !== "live") throw new Error("VIDEO_STREAM_ENDED");
+
+    const initialTime = this.video.currentTime;
+    await this.video.play();
+    await new Promise((resolve, reject) => {
+      const startedAt = performance.now();
+      const check = () => {
+        if (!this.stream || track.readyState !== "live") {
+          reject(new Error("VIDEO_STREAM_ENDED"));
+          return;
+        }
+        if (this.video.currentTime > initialTime) {
+          resolve();
+          return;
+        }
+        if (performance.now() - startedAt >= timeoutMs) {
+          reject(new Error("VIDEO_FRAME_STALLED"));
+          return;
+        }
+        requestAnimationFrame(check);
+      };
+      requestAnimationFrame(check);
+    });
   }
 
   async waitUntilVideoReady(timeoutMs = 10000) {
@@ -148,6 +227,14 @@ export function cameraErrorMessage(error) {
 
   if (error.message === "VIDEO_STREAM_ERROR") {
     return "카메라 영상 스트림을 재생하지 못했습니다.";
+  }
+
+  if (error.message === "VIDEO_FRAME_STALLED") {
+    return "카메라 프레임이 멈춰 영상 스트림을 다시 연결합니다.";
+  }
+
+  if (error.message === "VIDEO_STREAM_ENDED") {
+    return "카메라 스트림이 종료되어 다시 연결합니다.";
   }
 
   if (error.message === "CAMERA_SWITCH_UNAVAILABLE") {
