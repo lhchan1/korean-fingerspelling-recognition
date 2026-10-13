@@ -3,17 +3,14 @@
 브라우저 카메라와 온디바이스 수어 인식을 검증하기 위한 독립 웹 프로젝트입니다.
 기존 Python 학습 프로젝트와 데이터셋은 이 폴더에 복사하지 않습니다.
 
-현재 배포 모델은 `word_lstm_v9_stable_split_seed42`입니다. 원본은
-`word_sign/training/word_lstm_v9_stable_split_seed42/word_sign_lstm.keras`이며,
+현재 배포 모델은 `word_lstm_v7_demo_randomsplit`입니다. 원본은
+`word_sign/training/word_lstm_v7_demo_randomsplit/word_sign_lstm.keras`이며,
 24클래스·56,888 파라미터 모델을 TensorFlow.js 가중치로 변환해 사용합니다.
 
 ## 현재 구현
 
 - 전면 카메라 시작
 - 전면/후면 카메라 전환
-- 카메라 전환 시 새 영상 크기 확정 후 MediaPipe 추적기 재생성
-- 카메라 전환 시 이전 60프레임 추론 버퍼 초기화
-- 전환 실패 시 이전 카메라 자동 복구
 - 카메라 종료 및 리소스 해제
 - 권한 거부와 카메라 오류 안내
 - 모바일 반응형 화면
@@ -46,7 +43,7 @@ KoBART WebSocket 주소는 `src/kobart-client.js`의
 
 ## 실행 구조
 
-배포 서버에는 HTML/CSS/JavaScript와 함께 TensorFlow.js v9 가중치,
+배포 서버에는 HTML/CSS/JavaScript와 함께 TensorFlow.js v7 가중치,
 MediaPipe `.task`, WASM 파일을 올립니다. 사용자가 처음 접속하면 브라우저가
 이 정적 파일들을 내려받고, 카메라 영상과 146차원 특징 추론은 사용자 기기
 안에서 처리합니다. 현재 웹은 카메라 영상이나 랜드마크를 서버로 전송하지 않습니다.
@@ -56,7 +53,7 @@ MediaPipe `.task`, WASM 파일을 올립니다. 사용자가 처음 접속하면
 Python 3가 설치된 환경에서 다음 명령을 실행합니다.
 
 ```bash
-cd /Users/heechan/visualcodeworkspace/korean-fingerspelling-recognition-deploy/web
+cd ~/visualcodeworkspace/capstone-web
 python3 dev_server.py
 ```
 
@@ -87,7 +84,7 @@ Build output directory: .
 
 배포 후 발급되는 `https://<project>.pages.dev` 주소에서 카메라를 테스트합니다.
 `_headers`는 카메라 권한을 같은 출처로 제한하고, 보안 헤더·WASM MIME 타입·
-버전된 v9 가중치의 장기 캐시를 설정합니다. `model.json`, `config.json`,
+버전된 v7 가중치의 장기 캐시를 설정합니다. `model.json`, `config.json`,
 `labels.json`은 재배포 시 갱신되도록 캐시하지 않습니다.
 TensorFlow.js 4.22 번들이 런타임에 동적 함수를 생성하므로 `script-src`에는
 `'unsafe-eval'`이 포함됩니다. 외부 스크립트 출처는 허용하지 않고 `'self'`만 유지합니다.
@@ -105,7 +102,7 @@ capstone-web/
 ├── dev/                 # 개발 전용 테스트 페이지
 ├── public/
 │   └── models/
-│       └── word-sign/    # v9 TensorFlow.js 모델과 가중치
+│       └── word-sign/    # v7 TensorFlow.js 모델과 가중치
 ├── src/
 │   ├── camera.js         # 카메라 생명주기와 오류 처리
 │   ├── kobart-client.js  # KoBART WebSocket 요청·응답 검증
