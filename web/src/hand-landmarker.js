@@ -173,6 +173,12 @@ export class BrowserHandLandmarker {
     this.closeLandmarkers();
   }
 
+  async reinitializeForVideoSource() {
+    this.dispose();
+    await this.initialize();
+    this.resizeCanvas();
+  }
+
   predict = () => {
     try {
       if (this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {

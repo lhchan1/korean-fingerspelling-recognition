@@ -1,12 +1,18 @@
-import { CameraController, cameraErrorMessage } from "./camera.js";
-import { BrowserHandLandmarker } from "./hand-landmarker.js";
+import {
+  CameraController,
+  cameraErrorMessage,
+} from "./camera.js?v=20261013-camera-switch-fix1";
+import { BrowserHandLandmarker } from "./hand-landmarker.js?v=20261013-camera-switch-fix1";
 import { DebugLogger } from "./debug-log.js";
 import { WORD_SIGN_LABELS_URL, WordSignInference } from "./inference.js";
 import {
   KOBART_WEBSOCKET_URL,
   requestKoreanSentence,
 } from "./kobart-client.js";
-import { IdleSentenceCollector, RecognitionStabilizer } from "./recognition.js";
+import {
+  IdleSentenceCollector,
+  RecognitionStabilizer,
+} from "./recognition.js?v=20261013-camera-switch-fix1";
 
 const elements = {
   video: document.querySelector("#camera"),
@@ -57,6 +63,8 @@ let idleSegmentConsumed = false;
 let randomTestBusy = false;
 let testableLabels = null;
 let visibilityPaused = false;
+let cameraOperationBusy = false;
+let cameraSessionId = 0;
 const handLandmarker = new BrowserHandLandmarker(
   elements.video,
   elements.landmarkCanvas,
@@ -81,9 +89,14 @@ const handLandmarker = new BrowserHandLandmarker(
 );
 let modelReady = false;
 
-function resetTemporalInference(logMessage = null) {
+function resetTemporalInference(
+  logMessage = null,
+  { preserveRecognitionArm = false } = {},
+) {
   inference.reset();
-  renderRecognition(recognizer.resetWindow());
+  renderRecognition(
+    recognizer.resetWindow({ preserveArmed: preserveRecognitionArm }),
+  );
   renderSentenceState(sentenceCollector.reset());
   renderPrediction({ size: 0, progress: 0 });
   if (logMessage) logger.info(logMessage);
@@ -444,9 +457,9 @@ function renderCameraState() {
       : "후면 카메라"
     : "대기 중";
 
-  elements.startButton.disabled = running;
-  elements.switchButton.disabled = !running;
-  elements.stopButton.disabled = !running;
+  elements.startButton.disabled = running || cameraOperationBusy;
+  elements.switchButton.disabled = !running || !modelReady || cameraOperationBusy;
+  elements.stopButton.disabled = !running || cameraOperationBusy;
 }
 
 function renderSecurityState() {
@@ -460,6 +473,8 @@ function renderSecurityState() {
 }
 
 async function startCamera() {
+  if (cameraOperationBusy || camera.isRunning) return;
+  const sessionId = ++cameraSessionId;
   logger.info("카메라 시작 버튼 클릭");
   setStatus("카메라 권한을 요청하고 있습니다…", "loading");
   elements.startButton.disabled = true;
@@ -469,6 +484,7 @@ async function startCamera() {
     logger.info("카메라 스트림 연결 완료", {
       width: elements.video.videoWidth,
       height: elements.video.videoHeight,
+      settings: camera.settings,
     });
     renderCameraState();
     setStatus("카메라가 정상적으로 연결되었습니다.", "success");
@@ -489,12 +505,24 @@ async function startCamera() {
     try {
       // 모바일 브라우저의 순간 메모리 사용량을 줄이기 위해 큰 런타임을 순차 로드합니다.
       await handLandmarker.initialize();
+      if (sessionId !== cameraSessionId || !camera.isRunning) return;
       await inference.initialize();
+      if (sessionId !== cameraSessionId || !camera.isRunning) {
+        logger.info("카메라가 종료되어 초기화 결과를 적용하지 않습니다.");
+        return;
+      }
       modelReady = true;
       elements.modelState.textContent = "준비 완료";
-      handLandmarker.start();
+      if (document.hidden) {
+        visibilityPaused = true;
+      } else {
+        visibilityPaused = false;
+        handLandmarker.start();
+      }
+      renderCameraState();
       setStatus("카메라·MediaPipe·24클래스 모델이 준비되었습니다.", "success");
     } catch (error) {
+      if (sessionId !== cameraSessionId) return;
       logger.error("MediaPipe 초기화 실패", error);
       console.error("MediaPipe initialization failed:", error);
       elements.modelState.textContent = "로드 실패";
@@ -503,34 +531,97 @@ async function startCamera() {
         "error",
       );
     }
+  } else if (document.hidden) {
+    visibilityPaused = true;
   } else {
+    visibilityPaused = false;
     handLandmarker.start();
   }
 }
 
 async function switchCamera() {
+  if (cameraOperationBusy || !camera.isRunning || !modelReady) return;
+  const sessionId = ++cameraSessionId;
+  const previousFacingMode = camera.facingMode;
+  const previousDeviceId = camera.settings?.deviceId ?? null;
+  cameraOperationBusy = true;
   setStatus("카메라를 전환하고 있습니다…", "loading");
-  elements.switchButton.disabled = true;
+  renderCameraState();
 
   try {
     handLandmarker.stop();
+    resetTemporalInference(
+      "카메라 전환으로 추론 버퍼와 MediaPipe 추적 상태를 초기화합니다.",
+      { preserveRecognitionArm: true },
+    );
     await camera.switchFacingMode();
-    handLandmarker.start();
-    renderCameraState();
+    if (sessionId !== cameraSessionId || !camera.isRunning) return;
+    const nextDeviceId = camera.settings?.deviceId ?? null;
+    if (
+      previousDeviceId &&
+      nextDeviceId === previousDeviceId &&
+      camera.facingMode === previousFacingMode
+    ) {
+      throw new Error("CAMERA_SWITCH_UNAVAILABLE");
+    }
+    await handLandmarker.reinitializeForVideoSource();
+    if (sessionId !== cameraSessionId || !camera.isRunning) return;
+    if (document.hidden) {
+      visibilityPaused = true;
+    } else {
+      visibilityPaused = false;
+      handLandmarker.start();
+    }
+    logger.info("카메라 전환 완료", {
+      requestedFacingMode: camera.facingMode,
+      settings: camera.settings,
+      width: elements.video.videoWidth,
+      height: elements.video.videoHeight,
+    });
     setStatus(
       `${camera.isFrontCamera ? "전면" : "후면"} 카메라로 전환했습니다.`,
       "success",
     );
   } catch (error) {
-    console.error(error);
-    camera.stop();
+    logger.error("카메라 전환 실패", error);
+    console.error("Camera switch failed:", error);
     handLandmarker.stop();
+    try {
+      camera.facingMode = previousFacingMode;
+      await camera.start();
+      if (sessionId !== cameraSessionId) return;
+      await handLandmarker.reinitializeForVideoSource();
+      if (sessionId !== cameraSessionId || !camera.isRunning) return;
+      if (document.hidden) {
+        visibilityPaused = true;
+      } else {
+        visibilityPaused = false;
+        handLandmarker.start();
+      }
+      logger.info("이전 카메라 복구 완료", {
+        settings: camera.settings,
+        width: elements.video.videoWidth,
+        height: elements.video.videoHeight,
+      });
+      setStatus(
+        `카메라 전환에 실패해 이전 카메라로 복구했습니다: ${cameraErrorMessage(error)}`,
+        "error",
+      );
+    } catch (recoveryError) {
+      logger.error("이전 카메라 복구 실패", recoveryError);
+      camera.stop();
+      handLandmarker.stop();
+      setStatus(cameraErrorMessage(error), "error");
+    }
+  } finally {
+    if (sessionId === cameraSessionId) cameraOperationBusy = false;
     renderCameraState();
-    setStatus(cameraErrorMessage(error), "error");
   }
 }
 
 function stopCamera() {
+  cameraSessionId += 1;
+  cameraOperationBusy = false;
   logger.info("카메라 종료");
   handLandmarker.stop();
   camera.stop();

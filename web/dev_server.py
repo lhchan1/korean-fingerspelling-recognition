@@ -13,6 +13,12 @@ PORT = 5173
 
 
 class DevelopmentHandler(SimpleHTTPRequestHandler):
+    def end_headers(self) -> None:
+        # 개발 중 바뀐 ES module과 테스트 코드가 304 캐시에 섞이지 않게 합니다.
+        if self.path == "/" or self.path.startswith(("/src/", "/dev/")):
+            self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
     def copyfile(self, source, outputfile) -> None:
         try:
             shutil.copyfileobj(source, outputfile)

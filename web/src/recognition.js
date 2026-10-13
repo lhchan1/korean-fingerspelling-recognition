@@ -74,9 +74,9 @@ export class RecognitionStabilizer {
     return this.state({ consumed: true, consumedTokens: [...expected] });
   }
 
-  resetWindow() {
+  resetWindow({ preserveArmed = false } = {}) {
     this.recent = [];
-    this.armed = true;
+    if (!preserveArmed) this.armed = true;
     return this.state();
   }
 
@@ -117,7 +117,7 @@ export class IdleSentenceCollector {
     const payload = {
       words: [...tokens],
       clientCreatedAt: new Date().toISOString(),
-      source: "web-on-device-v7",
+      source: "web-on-device-v9",
     };
     this.reset();
     return this.state({ ready: true, payload, elapsedMs, remainingMs: 0 });

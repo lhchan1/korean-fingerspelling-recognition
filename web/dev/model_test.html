@@ -4,27 +4,6 @@
   <body>
     <pre id="result">RUNNING</pre>
     <script src="../public/vendor/tensorflow/tf.min.js"></script>
-    <script>
-      (async () => {
-        const output = document.querySelector("#result");
-        try {
-          const model = await tf.loadLayersModel("../public/models/word-sign/model.json?v=word-lstm-v9-stable-split-seed42");
-          const probabilities = tf.tidy(() =>
-            Array.from(model.predict(tf.zeros([1, 60, 146], "float32")).dataSync())
-          );
-          output.textContent = JSON.stringify({
-            status: "PASS",
-            tfjs: tf.version.tfjs,
-            inputShape: model.inputs[0].shape,
-            outputShape: model.outputs[0].shape,
-            probabilityCount: probabilities.length,
-            probabilitySum: probabilities.reduce((sum, value) => sum + value, 0),
-            probabilities,
-          });
-        } catch (error) {
-          output.textContent = JSON.stringify({ status: "FAIL", error: error.stack || error.message });
-        }
-      })();
-    </script>
+    <script src="./model-test.js"></script>
   </body>
 </html>

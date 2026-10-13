@@ -3,86 +3,9 @@
   <head><meta charset="UTF-8"><title>Recognition stabilizer test</title></head>
   <body>
     <pre id="result">RUNNING</pre>
-    <script type="module">
-      import { IdleSentenceCollector, RecognitionStabilizer } from "../src/recognition.js";
-
-      const result = document.querySelector("#result");
-      try {
-        const recognizer = new RecognitionStabilizer();
-        for (let i = 0; i < 5; i += 1) recognizer.push({ label: "나", confidence: 0.9 });
-        for (let i = 0; i < 5; i += 1) recognizer.push({ label: "나", confidence: 0.9 });
-        if (recognizer.state().tokens.join(",") !== "나") throw new Error("held pose duplicated");
-
-        for (let i = 0; i < 5; i += 1) recognizer.push({ label: "IDLE", confidence: 0.9 });
-        for (let i = 0; i < 5; i += 1) recognizer.push({ label: "아프다", confidence: 0.9 });
-        for (let i = 0; i < 5; i += 1) recognizer.push({ label: "아프다", confidence: 0.9 });
-        const tokens = recognizer.state().tokens;
-        if (tokens.join(",") !== "나,아프다") throw new Error(`unexpected tokens: ${tokens}`);
-
-        recognizer.undo();
-        if (recognizer.state().tokens.join(",") !== "나") throw new Error("undo failed");
-        recognizer.clear();
-        if (recognizer.state().tokens.length !== 0) throw new Error("clear failed");
-
-        for (let index = 0; index < 13; index += 1) {
-          for (let vote = 0; vote < 5; vote += 1) {
-            recognizer.push({ label: `단어${index}`, confidence: 0.9 });
-          }
-          for (let vote = 0; vote < 5; vote += 1) {
-            recognizer.push({ label: "IDLE", confidence: 0.9 });
-          }
-        }
-        const longTokens = recognizer.state().tokens;
-        if (longTokens.length !== 13 || longTokens[0] !== "단어0") {
-          throw new Error("long sentence was truncated");
-        }
-        recognizer.clear();
-
-        const expectedSentence = ["어제", "기침", "콧물", "열", "가래", "있다"];
-        for (const word of expectedSentence) {
-          for (let vote = 0; vote < 5; vote += 1) {
-            recognizer.push({ label: word, confidence: 0.9 });
-          }
-          for (let vote = 0; vote < 5; vote += 1) {
-            recognizer.push({ label: "IDLE", confidence: 0.9 });
-          }
-        }
-        if (recognizer.state().tokens.join(",") !== expectedSentence.join(",")) {
-          throw new Error(`multiword accumulation failed: ${recognizer.state().tokens}`);
-        }
-        recognizer.clear();
-
-        const collector = new IdleSentenceCollector({ idleDurationMs: 3000 });
-        const idleState = { stableLabel: "IDLE", tokens: ["나", "아프다"] };
-        if (collector.update(idleState, 1000).ready) throw new Error("idle completed early");
-        const counting = collector.update(idleState, 3000);
-        if (!counting.active || counting.remainingMs !== 1000) throw new Error("idle countdown failed");
-        const cancelled = collector.update({ stableLabel: "나", tokens: ["나", "아프다"] }, 3500);
-        if (cancelled.active || cancelled.ready) throw new Error("idle cancellation failed");
-        collector.update(idleState, 4000);
-        const ready = collector.update(idleState, 7000);
-        if (!ready.ready || ready.payload.words.join(",") !== "나,아프다") {
-          throw new Error("sentence payload failed");
-        }
-        if (collector.update({ stableLabel: "IDLE", tokens: [] }, 10000).ready) {
-          throw new Error("empty sentence was emitted");
-        }
-
-        recognizer.clear();
-        recognizer.tokens.push("어제", "기침", "새단어");
-        const consumed = recognizer.consumePrefix(["어제", "기침"]);
-        if (!consumed.consumed || consumed.tokens.join(",") !== "새단어") {
-          throw new Error("sent prefix consumption failed");
-        }
-        const mismatch = recognizer.consumePrefix(["없는단어"]);
-        if (mismatch.consumed || mismatch.tokens.join(",") !== "새단어") {
-          throw new Error("mismatched prefix was removed");
-        }
-
-        result.textContent = JSON.stringify({ status: "PASS", payload: ready.payload });
-      } catch (error) {
-        result.textContent = JSON.stringify({ status: "FAIL", error: error.message });
-      }
-    </script>
+    <script
+      type="module"
+      src="./recognition-test.js?v=20261013-camera-switch-fix1"
+    ></script>
   </body>
 </html>
