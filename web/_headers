@@ -20,3 +20,6 @@
 
 /public/models/word-sign/labels.json
   Cache-Control: no-cache
+
+/public/models/word-sign/word-lstm-v10-seed44.weights.bin
+  Cache-Control: public, max-age=31536000, immutable

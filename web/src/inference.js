@@ -1,4 +1,4 @@
-const MODEL_VERSION = "word-lstm-v9-stable-split-seed42";
+const MODEL_VERSION = "word-lstm-v10-belly-seed44";
 const MODEL_URL = `/public/models/word-sign/model.json?v=${MODEL_VERSION}`;
 const CONFIG_URL = `/public/models/word-sign/config.json?v=${MODEL_VERSION}`;
 export const WORD_SIGN_LABELS_URL =
