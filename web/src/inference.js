@@ -104,7 +104,7 @@ export class WordSignInference {
     const ranked = probabilities
       .map((confidence, id) => ({ label: this.labels[id], confidence, id }))
       .sort((a, b) => b.confidence - a.confidence);
-    return { ...state, prediction: ranked[0], top: ranked.slice(0, 3) };
+    return { ...state, prediction: ranked[0] };
   }
 
   log(message, detail) {

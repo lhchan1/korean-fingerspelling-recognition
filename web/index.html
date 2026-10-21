@@ -3,135 +3,118 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#08111f" />
-    <meta
-      name="description"
-      content="브라우저에서 동작하는 실시간 수어 인식 카메라 테스트"
-    />
-    <title>수어 인식 카메라</title>
-    <link rel="stylesheet" href="./src/style.css" />
+    <meta name="theme-color" content="#0a1020" />
+    <meta name="description" content="카메라로 수어 단어를 인식하고 문장으로 연결하는 시연" />
+    <title>손으로 잇는 대화 · 수어 인식 시연</title>
+    <link rel="stylesheet" href="./src/style.css?v=demo-ui-1" />
   </head>
   <body>
     <main class="app-shell">
-      <section class="camera-card" aria-label="카메라 미리보기">
-        <div id="cameraStage" class="camera-stage is-empty">
-          <video id="camera" autoplay playsinline muted></video>
-          <canvas id="landmarkCanvas" aria-hidden="true"></canvas>
-          <div id="emptyState" class="empty-state">
-            <span class="camera-icon" aria-hidden="true">◉</span>
-            <strong>카메라가 꺼져 있습니다</strong>
-            <span>아래 버튼을 눌러 카메라 권한을 허용해주세요.</span>
+      <header class="page-header">
+        <div class="brand-mark" aria-hidden="true">손</div>
+        <div class="header-copy">
+          <p class="eyebrow">SIGN TO SENTENCE · LIVE DEMO</p>
+          <h1>손으로 잇는 대화</h1>
+          <p class="page-subtitle">수어 동작을 단어로 읽고, 자연스러운 문장으로 연결합니다.</p>
+        </div>
+        <span class="demo-badge">시연 모드</span>
+      </header>
+
+      <div class="demo-grid">
+        <section class="camera-card" aria-label="수어 인식 카메라">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">01 · CAMERA</p>
+              <h2>수어 인식 화면</h2>
+            </div>
+            <span class="section-hint">화면에 상체와 손을 보여주세요</span>
           </div>
-          <div class="viewfinder" aria-hidden="true"></div>
-          <span id="cameraLabel" class="camera-label">대기 중</span>
-        </div>
 
-        <div class="status-row" aria-live="polite">
-          <span id="statusDot" class="status-dot"></span>
-          <p id="statusMessage">카메라 시작 버튼을 눌러주세요.</p>
-        </div>
+          <div id="cameraStage" class="camera-stage is-empty">
+            <video id="camera" autoplay playsinline muted></video>
+            <canvas id="landmarkCanvas" aria-hidden="true"></canvas>
+            <div id="emptyState" class="empty-state">
+              <span class="camera-icon" aria-hidden="true">◉</span>
+              <strong>카메라를 켜고 수어를 보여주세요</strong>
+              <span>시작 버튼을 누르면 인식이 시작됩니다.</span>
+            </div>
+            <div class="viewfinder" aria-hidden="true"></div>
+            <span id="cameraLabel" class="camera-label">대기 중</span>
+          </div>
 
-        <div class="metrics" aria-label="검출 상태">
-          <span>MediaPipe <strong id="modelState">준비 전</strong></span>
-          <span>검출 손 <strong id="handCount">0</strong></span>
-          <span>상체 Pose <strong id="poseState">미검출</strong></span>
-          <span>특징 <strong id="featureState">0 / 146</strong></span>
-          <span>처리 속도 <strong id="inferenceFps">0.0 FPS</strong></span>
-        </div>
-
-        <div class="controls">
-          <button id="startButton" class="button button-primary" type="button">
-            카메라 시작
-          </button>
-          <button id="switchButton" class="button" type="button" disabled>
-            전·후면 전환
-          </button>
-          <button id="stopButton" class="button button-danger" type="button" disabled>
-            카메라 종료
-          </button>
-        </div>
-      </section>
-
-      <section class="result-card" aria-label="추론 결과">
-        <div>
-          <p class="card-label">실시간 추론</p>
-          <h2 id="predictionLabel">모델 준비 중</h2>
-          <p id="predictionConfidence" class="prediction-confidence">신뢰도 0.0%</p>
-          <p id="stableState" class="stable-state">확정 대기 · 0 / 3표</p>
-        </div>
-        <div class="prediction-panel">
-          <div class="buffer-header">
-            <span>4초 특징 버퍼</span>
-            <strong id="bufferState">0 / 60</strong>
+          <div class="live-readout" aria-live="polite" aria-atomic="true">
+            <span class="readout-indicator" aria-hidden="true"></span>
+            <div class="readout-copy">
+              <span class="readout-caption">현재 인식되는 수어 · Top 1</span>
+              <strong id="predictionLabel">카메라 대기 중</strong>
+            </div>
+            <span id="predictionConfidence" class="prediction-confidence">예측 대기</span>
+          </div>
+          <div class="recognition-progress">
+            <span id="stableState" class="stable-state">확정 대기 · 0 / 3표</span>
+            <span id="bufferState">0 / 60</span>
           </div>
           <div class="progress-track" aria-hidden="true">
             <div id="bufferProgress" class="progress-value"></div>
           </div>
-          <ol id="topPredictions" class="top-predictions">
-            <li>예측 대기 중</li>
-          </ol>
-        </div>
-      </section>
 
-      <section class="recognized-card" aria-label="확정된 인식 단어">
-        <div class="recognized-header">
-          <div>
-            <p class="card-label">확정된 인식 단어</p>
-            <p class="recognized-help">
-              신뢰도 75% 이상인 예측이 최근 5회 중 3회 이상 일치하면 추가됩니다.
-              입력 후 IDLE이 3초간 유지되면 KoBART 서버로 단어가 자동 전송됩니다.
-            </p>
+          <div class="camera-footer">
+            <div class="status-row" aria-live="polite">
+              <span id="statusDot" class="status-dot"></span>
+              <p id="statusMessage">카메라 시작 버튼을 눌러주세요.</p>
+            </div>
+            <div class="controls">
+              <button id="startButton" class="button button-primary" type="button">카메라 시작</button>
+              <button id="switchButton" class="button" type="button" disabled>전·후면 전환</button>
+              <button id="stopButton" class="button button-quiet" type="button" disabled>종료</button>
+            </div>
+          </div>
+
+          <details class="diagnostics">
+            <summary>인식 상태 자세히 보기</summary>
+            <div class="metrics" aria-label="검출 상태">
+              <span>MediaPipe <strong id="modelState">준비 전</strong></span>
+              <span>검출 손 <strong id="handCount">0</strong></span>
+              <span>상체 Pose <strong id="poseState">미검출</strong></span>
+              <span>특징 <strong id="featureState">0 / 146</strong></span>
+              <span>처리 속도 <strong id="inferenceFps">0.0 FPS</strong></span>
+            </div>
+          </details>
+        </section>
+
+        <section class="recognized-card" aria-label="인식 결과와 생성 문장">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">02 · WORDS</p>
+              <h2>모인 단어</h2>
+            </div>
+            <span class="section-hint">확정된 단어만 표시</span>
+          </div>
+          <div id="recognizedTokens" class="recognized-tokens" aria-live="polite">
+            <span class="token-empty">아직 확정된 단어가 없습니다.</span>
           </div>
           <div class="recognized-actions">
-            <button id="undoTokenButton" class="button button-small" type="button" disabled>
-              마지막 단어 취소
-            </button>
-            <button id="clearTokensButton" class="button button-small button-danger" type="button" disabled>
-              전체 지우기
-            </button>
+            <button id="undoTokenButton" class="button button-small" type="button" disabled>마지막 단어 취소</button>
+            <button id="clearTokensButton" class="button button-small button-quiet" type="button" disabled>모두 지우기</button>
           </div>
-        </div>
-        <div id="recognizedTokens" class="recognized-tokens" aria-live="polite">
-          <span class="token-empty">아직 확정된 단어가 없습니다.</span>
-        </div>
-        <div class="sentence-ready-panel" aria-live="polite">
-          <p id="idleState" class="idle-state">단어 입력 후 IDLE 3초를 기다립니다.</p>
-          <p id="generationState" class="generation-state" data-state="collecting">
-            수어 단어를 모으는 중입니다.
-          </p>
-          <p class="sentence-label">생성된 한국어 문장</p>
-          <p id="generatedSentence" class="generated-sentence">
-            아직 생성된 문장이 없습니다.
-          </p>
-          <div class="connection-test-row">
-            <button id="randomTestButton" class="button button-small" type="button">
-              랜덤 3단어 통신 테스트
-            </button>
-            <span id="randomTestWord">IDLE·OTHER를 제외한 서로 다른 단어 3개를 한 번에 전송합니다.</span>
-          </div>
-          <form id="manualWordsForm" class="manual-words-form">
-            <label for="manualWordsInput">직접 입력 통신 테스트</label>
-            <div class="manual-words-controls">
-              <input
-                id="manualWordsInput"
-                type="text"
-                maxlength="300"
-                autocomplete="off"
-                placeholder="예: 나 아프다 머리"
-              />
-              <button id="manualSendButton" class="button button-small" type="submit">
-                입력 단어 배열 전송
-              </button>
+          <p class="recognized-help">같은 예측이 최근 5회 중 3회 이상 일치하고 신뢰도 75% 이상이면 단어가 확정됩니다.</p>
+
+          <div class="sentence-ready-panel" aria-live="polite">
+            <p class="eyebrow">03 · SENTENCE</p>
+            <h2>완성된 문장</h2>
+            <p id="generatedSentence" class="generated-sentence">수어로 단어를 입력하면 여기에 문장이 나타납니다.</p>
+            <div class="sentence-status">
+              <p id="idleState" class="idle-state">단어 입력 후 IDLE 3초를 기다립니다.</p>
+              <p id="generationState" class="generation-state" data-state="collecting">수어 단어를 모으는 중입니다.</p>
             </div>
-            <span id="manualWordsPreview">띄어쓰기를 기준으로 문자열 배열을 만듭니다.</span>
-          </form>
-        </div>
-      </section>
+          </div>
+        </section>
+      </div>
 
       <details class="debug-card">
-        <summary>실시간 개발 로그</summary>
+        <summary>개발 로그</summary>
         <div class="debug-toolbar">
-          <span>로컬 개발 서버 사용 시 VS Code 터미널에도 기록됩니다.</span>
+          <span>오류 확인과 상태 점검에 사용합니다.</span>
           <button id="clearLogButton" type="button">로그 지우기</button>
         </div>
         <pre id="debugLog" aria-live="polite"></pre>
@@ -139,6 +122,6 @@
     </main>
 
     <script src="./public/vendor/tensorflow/tf.min.js"></script>
-    <script type="module" src="./src/main.js?v=word-lstm-v10-belly-seed44"></script>
+    <script type="module" src="./src/main.js?v=demo-ui-1"></script>
   </body>
 </html>
