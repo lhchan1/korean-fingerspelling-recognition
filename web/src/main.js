@@ -26,6 +26,7 @@ const elements = {
   featureState: document.querySelector("#featureState"),
   debugLog: document.querySelector("#debugLog"),
   clearLogButton: document.querySelector("#clearLogButton"),
+  liveReadout: document.querySelector("#liveReadout"),
   predictionLabel: document.querySelector("#predictionLabel"),
   predictionConfidence: document.querySelector("#predictionConfidence"),
   bufferState: document.querySelector("#bufferState"),
@@ -48,6 +49,7 @@ let predictionBusy = false;
 let requestInFlight = false;
 let idleSegmentConsumed = false;
 let visibilityPaused = false;
+let lastUsableFrameAt = 0;
 const handLandmarker = new BrowserHandLandmarker(
   elements.video,
   elements.landmarkCanvas,
@@ -57,10 +59,12 @@ const handLandmarker = new BrowserHandLandmarker(
     elements.featureState.textContent = `${poseDetected ? features.length : 0} / 146`;
     elements.inferenceFps.textContent = `${fps.toFixed(1)} FPS`;
     if (!features.length || !poseDetected) {
-      elements.predictionLabel.textContent = "손과 상체를 보여주세요";
-      elements.predictionConfidence.textContent = "예측 대기";
+      if (timestamp - lastUsableFrameAt > 700) {
+        setCurrentSign("손·상체 미검출", "화면에 손과 상체를 보여주세요", "waiting");
+      }
       return;
     }
+    lastUsableFrameAt = timestamp;
     if (visibilityPaused || predictionBusy) return;
 
     predictionBusy = true;
@@ -78,6 +82,7 @@ const handLandmarker = new BrowserHandLandmarker(
 let modelReady = false;
 
 function resetTemporalInference(logMessage = null) {
+  lastUsableFrameAt = 0;
   inference.reset();
   renderRecognition(recognizer.resetWindow());
   renderSentenceState(sentenceCollector.reset());
@@ -112,16 +117,29 @@ function renderPrediction(state) {
   elements.bufferProgress.style.width = `${Math.min(100, (state.progress ?? 0) * 100)}%`;
   if (!state.prediction) {
     if (size < 60) {
-      elements.predictionLabel.textContent = size ? "수어 동작 분석 중" : "수어 동작을 보여주세요";
-      elements.predictionConfidence.textContent = "예측 대기";
+      setCurrentSign(
+        size ? "수어 분석 중" : "인식 대기",
+        size ? `${size}/60프레임 수집 중` : "수어 동작을 보여주세요",
+        "waiting",
+      );
     }
     return;
   }
 
-  elements.predictionLabel.textContent = state.prediction.label;
-  elements.predictionConfidence.textContent =
-    `신뢰도 ${(state.prediction.confidence * 100).toFixed(1)}%`;
+  const label = state.prediction.label === "IDLE"
+    ? "동작 없음 · IDLE"
+    : state.prediction.label === "OTHER"
+      ? "기타 동작 · OTHER"
+      : state.prediction.label;
+  const confidence = `${(state.prediction.confidence * 100).toFixed(1)}%`;
   const recognitionState = recognizer.push(state.prediction);
+  setCurrentSign(
+    label,
+    recognitionState.added
+      ? `단어 확정 · ${confidence}`
+      : `예측 ${confidence} · 확정 전`,
+    recognitionState.added ? "confirmed" : "predicting",
+  );
   renderRecognition(recognitionState);
   if (recognitionState.added) {
     idleSegmentConsumed = false;
@@ -277,6 +295,18 @@ function renderGenerationState(state, message) {
   elements.generationState.textContent = message;
 }
 
+function setCurrentSign(label, detail, state) {
+  if (elements.predictionLabel.textContent !== label) {
+    elements.predictionLabel.textContent = label;
+  }
+  if (elements.predictionConfidence.textContent !== detail) {
+    elements.predictionConfidence.textContent = detail;
+  }
+  if (elements.liveReadout.dataset.state !== state) {
+    elements.liveReadout.dataset.state = state;
+  }
+}
+
 function renderRecognition(state) {
   const stableText = state.stableLabel
     ? `${state.stableLabel} 안정화 · ${state.votes} / ${state.minVotes}표`
@@ -351,6 +381,7 @@ async function startCamera() {
     });
     renderCameraState();
     setStatus("카메라가 정상적으로 연결되었습니다.", "success");
+    setCurrentSign("모델 준비 중", "잠시만 기다려주세요", "waiting");
   } catch (error) {
     logger.error("카메라 연결 실패", error);
     console.error(error);
@@ -371,18 +402,21 @@ async function startCamera() {
       await inference.initialize();
       modelReady = true;
       elements.modelState.textContent = "준비 완료";
+      setCurrentSign("인식 대기", "수어 동작을 보여주세요", "waiting");
       handLandmarker.start();
       setStatus("카메라·MediaPipe·24클래스 모델이 준비되었습니다.", "success");
     } catch (error) {
       logger.error("MediaPipe 초기화 실패", error);
       console.error("MediaPipe initialization failed:", error);
       elements.modelState.textContent = "로드 실패";
+      setCurrentSign("모델 로딩 실패", "오류 내용을 확인해주세요", "waiting");
       setStatus(
         `카메라는 연결됐지만 MediaPipe를 불러오지 못했습니다: ${error.message}`,
         "error",
       );
     }
   } else {
+    setCurrentSign("인식 대기", "수어 동작을 보여주세요", "waiting");
     handLandmarker.start();
   }
 }
@@ -416,8 +450,7 @@ function stopCamera() {
   visibilityPaused = false;
   idleSegmentConsumed = false;
   resetTemporalInference();
-  elements.predictionLabel.textContent = "카메라 대기 중";
-  elements.predictionConfidence.textContent = "예측 대기";
+  setCurrentSign("카메라 대기", "카메라 시작 후 표시", "waiting");
   renderCameraState();
   setStatus("카메라를 종료했습니다.", "idle");
 }

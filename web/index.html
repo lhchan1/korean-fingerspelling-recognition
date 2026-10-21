@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0a1020" />
     <meta name="description" content="카메라로 수어 단어를 인식하고 문장으로 연결하는 시연" />
     <title>손으로 잇는 대화 · 수어 인식 시연</title>
-    <link rel="stylesheet" href="./src/style.css?v=demo-ui-1" />
+    <link rel="stylesheet" href="./src/style.css?v=demo-ui-2" />
   </head>
   <body>
     <main class="app-shell">
@@ -42,13 +42,11 @@
             <span id="cameraLabel" class="camera-label">대기 중</span>
           </div>
 
-          <div class="live-readout" aria-live="polite" aria-atomic="true">
+          <div id="liveReadout" class="live-readout" data-state="waiting" aria-label="현재 수어 예측">
             <span class="readout-indicator" aria-hidden="true"></span>
-            <div class="readout-copy">
-              <span class="readout-caption">현재 인식되는 수어 · Top 1</span>
-              <strong id="predictionLabel">카메라 대기 중</strong>
-            </div>
-            <span id="predictionConfidence" class="prediction-confidence">예측 대기</span>
+            <span class="readout-caption">현재 수어</span>
+            <strong id="predictionLabel" aria-live="polite">카메라 대기</strong>
+            <span id="predictionConfidence" class="prediction-confidence">카메라 시작 후 표시</span>
           </div>
           <div class="recognition-progress">
             <span id="stableState" class="stable-state">확정 대기 · 0 / 3표</span>
@@ -122,6 +120,6 @@
     </main>
 
     <script src="./public/vendor/tensorflow/tf.min.js"></script>
-    <script type="module" src="./src/main.js?v=demo-ui-1"></script>
+    <script type="module" src="./src/main.js?v=demo-ui-2"></script>
   </body>
 </html>
