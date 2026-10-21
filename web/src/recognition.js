@@ -9,6 +9,8 @@ export class RecognitionStabilizer {
     this.recent = [];
     this.tokens = [];
     this.armed = true;
+    this.lastCommittedLabel = null;
+    this.previousEarlyStrongLabel = null;
   }
 
   push(prediction) {
@@ -18,18 +20,41 @@ export class RecognitionStabilizer {
     if (this.recent.length > this.windowSize) this.recent.shift();
 
     const { label, votes } = this.mostCommon();
-    const stableLabel = label !== null && votes >= this.minVotes ? label : null;
+    let stableLabel = label !== null && votes >= this.minVotes ? label : null;
+    const earlyStrongLabel =
+      prediction?.early &&
+      this.tokens.length === 0 &&
+      prediction.confidence >= 0.9 &&
+      !SUPPRESSED_LABELS.has(prediction.label)
+        ? prediction.label
+        : null;
+    const earlyConfirmed =
+      !stableLabel &&
+      earlyStrongLabel !== null &&
+      earlyStrongLabel === this.previousEarlyStrongLabel;
+    if (earlyConfirmed) {
+      stableLabel = earlyStrongLabel;
+    }
+    this.previousEarlyStrongLabel = earlyStrongLabel;
     let added = null;
 
     if (stableLabel && SUPPRESSED_LABELS.has(stableLabel)) {
       this.armed = true;
-    } else if (stableLabel && this.armed) {
+    } else if (
+      stableLabel &&
+      (this.armed ||
+        (stableLabel !== this.lastCommittedLabel &&
+          votes >= Math.min(this.windowSize, this.minVotes + 1)))
+    ) {
+      // A confirmed change of sign can start the next word without an IDLE/OTHER gap.
+      // Require one extra vote on direct changes to reduce transition flicker.
       this.tokens.push(stableLabel);
       this.armed = false;
+      this.lastCommittedLabel = stableLabel;
       added = stableLabel;
     }
 
-    return this.state({ accepted, stableLabel, votes, added });
+    return this.state({ accepted, stableLabel, votes, added, requiredVotes: earlyConfirmed ? 2 : this.minVotes });
   }
 
   mostCommon() {
@@ -59,6 +84,8 @@ export class RecognitionStabilizer {
     this.recent = [];
     this.tokens = [];
     this.armed = true;
+    this.lastCommittedLabel = null;
+    this.previousEarlyStrongLabel = null;
     return this.state();
   }
 
@@ -77,6 +104,8 @@ export class RecognitionStabilizer {
   resetWindow() {
     this.recent = [];
     this.armed = true;
+    this.lastCommittedLabel = null;
+    this.previousEarlyStrongLabel = null;
     return this.state();
   }
 
@@ -117,7 +146,7 @@ export class IdleSentenceCollector {
     const payload = {
       words: [...tokens],
       clientCreatedAt: new Date().toISOString(),
-      source: "web-on-device-v7",
+      source: "web-on-device",
     };
     this.reset();
     return this.state({ ready: true, payload, elapsedMs, remainingMs: 0 });

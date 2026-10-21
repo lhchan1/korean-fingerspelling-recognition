@@ -3,9 +3,9 @@
 브라우저 카메라와 온디바이스 수어 인식을 검증하기 위한 독립 웹 프로젝트입니다.
 기존 Python 학습 프로젝트와 데이터셋은 이 폴더에 복사하지 않습니다.
 
-현재 배포 모델은 `word_lstm_v7_demo_randomsplit`입니다. 원본은
-`word_sign/training/word_lstm_v7_demo_randomsplit/word_sign_lstm.keras`이며,
-24클래스·56,888 파라미터 모델을 TensorFlow.js 가중치로 변환해 사용합니다.
+현재 배포 모델은 v10(`word-lstm-v10-belly-seed44`)이며,
+`model.json`과 `word-lstm-v10-seed44.weights.bin`을 브라우저에서 사용합니다.
+24개 클래스에 `많이`는 포함되어 있지 않습니다.
 
 ## 현재 구현
 
@@ -19,10 +19,10 @@
 - 손 관절과 연결선 오버레이 및 처리 FPS 표시
 - 어깨·팔꿈치·손목 Pose 실시간 검출
 - 학습 코드와 동일한 왼손 63 + 오른손 63 + Pose 18 + 마스크 2 특징 생성
-- 15FPS로 60프레임 특징 버퍼 구성
-- 24클래스 TensorFlow.js 모델 실시간 추론 및 상위 3개 결과 표시
-- 신뢰도 75% 이상 예측을 최근 5회 중 3회 다수결로 안정화
-- IDLE/OTHER 전환 기반 동일 동작 중복 방지
+- 최대 15FPS로 60프레임 특징 버퍼 구성; 첫 단어는 45프레임을 60프레임으로 재표본화해 조기 추론
+- 24클래스 TensorFlow.js 모델 실시간 추론 및 Top-1 표시
+- 신뢰도 75% 이상 예측을 최근 5회 중 3회 다수결로 안정화; 연속 단어 전환에는 4표 요구
+- 서로 다른 수어는 IDLE/OTHER 간격 없이 누적하고, 같은 동작은 중복 확정 방지
 - 확정 단어 누적, 마지막 단어 취소, 전체 지우기
 - 확정 단어가 있는 상태에서 IDLE이 3초 유지되면 문장을 자동 확정
 - 고정 WSS 주소의 KoBART FastAPI 서버로 확정 단어 배열만 자동 전송
@@ -30,8 +30,6 @@
 - 성공 응답의 `session_id`, `type`, `sentence` 검증 후 생성 문장 표시
 - 성공 시 전송한 단어만 제거하고 처리 중 새로 인식한 단어는 보존
 - 실패 시 단어를 유지하며 같은 IDLE 구간에서 자동 재시도하지 않음
-- `IDLE`, `OTHER`를 제외한 22개 모델 단어 중 서로 다른 3개를 배열로 보내는 통신 테스트 버튼
-- 직접 입력한 문장을 공백 기준으로 나눠 문자열 배열로 보내는 통신 테스트 입력창
 - 모바일에서는 MediaPipe CPU delegate와 640×480 카메라를 사용해 WebGL 호환성을 확보
 - MediaPipe 프레임 오류가 발생해도 검출 루프를 유지하고 화면 로그에 원인 표시
 
@@ -43,7 +41,7 @@ KoBART WebSocket 주소는 `src/kobart-client.js`의
 
 ## 실행 구조
 
-배포 서버에는 HTML/CSS/JavaScript와 함께 TensorFlow.js v7 가중치,
+배포 서버에는 HTML/CSS/JavaScript와 함께 TensorFlow.js v10 가중치,
 MediaPipe `.task`, WASM 파일을 올립니다. 사용자가 처음 접속하면 브라우저가
 이 정적 파일들을 내려받고, 카메라 영상과 146차원 특징 추론은 사용자 기기
 안에서 처리합니다. 현재 웹은 카메라 영상이나 랜드마크를 서버로 전송하지 않습니다.
@@ -53,7 +51,7 @@ MediaPipe `.task`, WASM 파일을 올립니다. 사용자가 처음 접속하면
 Python 3가 설치된 환경에서 다음 명령을 실행합니다.
 
 ```bash
-cd ~/visualcodeworkspace/capstone-web
+cd /Users/heechan/visualcodeworkspace/korean-fingerspelling-recognition-deploy/web
 python3 dev_server.py
 ```
 
@@ -84,7 +82,7 @@ Build output directory: .
 
 배포 후 발급되는 `https://<project>.pages.dev` 주소에서 카메라를 테스트합니다.
 `_headers`는 카메라 권한을 같은 출처로 제한하고, 보안 헤더·WASM MIME 타입·
-버전된 v7 가중치의 장기 캐시를 설정합니다. `model.json`, `config.json`,
+버전된 v10 가중치의 장기 캐시를 설정합니다. `model.json`, `config.json`,
 `labels.json`은 재배포 시 갱신되도록 캐시하지 않습니다.
 TensorFlow.js 4.22 번들이 런타임에 동적 함수를 생성하므로 `script-src`에는
 `'unsafe-eval'`이 포함됩니다. 외부 스크립트 출처는 허용하지 않고 `'self'`만 유지합니다.
@@ -102,7 +100,7 @@ capstone-web/
 ├── dev/                 # 개발 전용 테스트 페이지
 ├── public/
 │   └── models/
-│       └── word-sign/    # v7 TensorFlow.js 모델과 가중치
+│       └── word-sign/    # v10 TensorFlow.js 모델과 가중치
 ├── src/
 │   ├── camera.js         # 카메라 생명주기와 오류 처리
 │   ├── kobart-client.js  # KoBART WebSocket 요청·응답 검증

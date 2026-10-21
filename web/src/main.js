@@ -153,10 +153,6 @@ function renderPrediction(state) {
     });
   }
 
-  if (recognitionState.stableLabel && recognitionState.stableLabel !== "IDLE") {
-    idleSegmentConsumed = false;
-  }
-
   if (requestInFlight) return;
   if (idleSegmentConsumed) {
     sentenceCollector.reset();
@@ -308,12 +304,13 @@ function setCurrentSign(label, detail, state) {
 }
 
 function renderRecognition(state) {
+  const requiredVotes = state.requiredVotes ?? state.minVotes;
   const stableText = state.stableLabel
-    ? `${state.stableLabel} 안정화 · ${state.votes} / ${state.minVotes}표`
-    : `확정 대기 · ${state.votes ?? 0} / ${state.minVotes}표`;
+    ? `${state.stableLabel} 안정화 · ${state.votes} / ${requiredVotes}표`
+    : `확정 대기 · ${state.votes ?? 0} / ${requiredVotes}표`;
   elements.stableState.textContent = state.armed
     ? stableText
-    : `${stableText} · 다음 단어 전환 대기`;
+    : `${stableText} · 다른 수어 또는 IDLE 대기`;
 
   if (state.tokens.length === 0) {
     const empty = document.createElement("span");

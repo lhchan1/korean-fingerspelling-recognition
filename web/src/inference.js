@@ -11,6 +11,7 @@ export class WordSignInference {
     this.labels = [];
     this.sequenceLength = 0;
     this.featureCount = 0;
+    this.earlyWindowLength = 45;
     this.buffer = [];
     this.lastPredictionAt = 0;
     this.predictIntervalMs = 250;
@@ -81,7 +82,7 @@ export class WordSignInference {
     const state = {
       progress: this.buffer.length / this.sequenceLength,
       size: this.buffer.length,
-      ready: this.buffer.length === this.sequenceLength,
+      ready: this.buffer.length >= this.earlyWindowLength,
     };
     if (!state.ready || timestamp - this.lastPredictionAt < this.predictIntervalMs) {
       return state;
@@ -90,7 +91,12 @@ export class WordSignInference {
     this.lastPredictionAt = timestamp;
     const probabilities = window.tf.tidy(() => {
       const flattened = new Float32Array(this.sequenceLength * this.featureCount);
-      this.buffer.forEach((frame, index) => {
+      const early = this.buffer.length < this.sequenceLength;
+      const frames = early
+        ? Array.from({ length: this.sequenceLength }, (_, index) =>
+            this.buffer[Math.round(index * (this.buffer.length - 1) / (this.sequenceLength - 1))])
+        : this.buffer;
+      frames.forEach((frame, index) => {
         flattened.set(frame, index * this.featureCount);
       });
       const input = window.tf.tensor3d(
@@ -104,7 +110,10 @@ export class WordSignInference {
     const ranked = probabilities
       .map((confidence, id) => ({ label: this.labels[id], confidence, id }))
       .sort((a, b) => b.confidence - a.confidence);
-    return { ...state, prediction: ranked[0] };
+    return {
+      ...state,
+      prediction: { ...ranked[0], early: this.buffer.length < this.sequenceLength },
+    };
   }
 
   log(message, detail) {

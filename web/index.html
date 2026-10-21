@@ -95,7 +95,7 @@
             <button id="undoTokenButton" class="button button-small" type="button" disabled>마지막 단어 취소</button>
             <button id="clearTokensButton" class="button button-small button-quiet" type="button" disabled>모두 지우기</button>
           </div>
-          <p class="recognized-help">같은 예측이 최근 5회 중 3회 이상 일치하고 신뢰도 75% 이상이면 단어가 확정됩니다.</p>
+          <p class="recognized-help">수어를 차례로 보여주면 단어가 누적됩니다. 마지막에는 IDLE을 3초 유지하세요.</p>
 
           <div class="sentence-ready-panel" aria-live="polite">
             <p class="eyebrow">03 · SENTENCE</p>
@@ -120,6 +120,6 @@
     </main>
 
     <script src="./public/vendor/tensorflow/tf.min.js"></script>
-    <script type="module" src="./src/main.js?v=demo-ui-2"></script>
+    <script type="module" src="./src/main.js?v=demo-sequence-1"></script>
   </body>
 </html>
