@@ -215,6 +215,9 @@ async function sendSentenceRequest(
 
   try {
     const response = await requestKoreanSentence(sentWords, {
+      onTiming(detail) {
+        logger.info("서버 요청–응답 시간 측정", detail);
+      },
       onStateChange(state, detail) {
         if (state === "connecting") {
           renderGenerationState("connecting", "KoBART 서버에 연결 중입니다…");

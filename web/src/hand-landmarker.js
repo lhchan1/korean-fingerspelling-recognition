@@ -1,3 +1,5 @@
+import { TimingSummary } from "./timing-metrics.js";
+
 const HAND_CONNECTIONS = [
   [0, 1], [1, 2], [2, 3], [3, 4],
   [0, 5], [5, 6], [6, 7], [7, 8],
@@ -49,6 +51,7 @@ export class BrowserHandLandmarker {
     this.lastInferenceTime = 0;
     this.lastFrameErrorAt = 0;
     this.sampleIntervalMs = 1000 / 15;
+    this.timings = new TimingSummary(detail => this.log("MediaPipe 처리 시간 요약", detail), { warmupSamples: 5 });
   }
 
   async initialize() {
@@ -144,6 +147,7 @@ export class BrowserHandLandmarker {
 
   start() {
     if (!this.landmarker || !this.poseLandmarker || this.animationFrame) return;
+    this.timings.reset();
     this.lastVideoTime = -1;
     this.frameTimes = [];
     this.lastHandCount = null;
@@ -154,6 +158,7 @@ export class BrowserHandLandmarker {
   }
 
   stop() {
+    this.timings.flush();
     if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
     this.animationFrame = null;
     this.lastVideoTime = -1;
@@ -185,12 +190,22 @@ export class BrowserHandLandmarker {
         ) {
           const startedAt = performance.now();
           const result = this.landmarker.detectForVideo(this.video, startedAt);
+          const handFinishedAt = performance.now();
           const poseResult = this.poseLandmarker.detectForVideo(this.video, startedAt);
+          const poseFinishedAt = performance.now();
           this.lastVideoTime = this.video.currentTime;
           this.lastInferenceTime = now;
           const hands = result.landmarks ?? [];
           const poses = poseResult.landmarks ?? [];
+          const featuresStartedAt = performance.now();
           const features = featuresForFrame(result, poseResult);
+          const featuresFinishedAt = performance.now();
+          this.timings.add({
+            handMs: handFinishedAt - startedAt,
+            poseMs: poseFinishedAt - handFinishedAt,
+            landmarkMs: poseFinishedAt - startedAt,
+            featureMs: featuresFinishedAt - featuresStartedAt,
+          }, featuresFinishedAt);
           this.draw(hands, poses[0] ?? null);
           this.recordFrame(performance.now());
 

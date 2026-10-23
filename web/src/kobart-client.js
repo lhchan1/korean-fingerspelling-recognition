@@ -16,6 +16,7 @@ export function requestKoreanSentence(
     url = KOBART_WEBSOCKET_URL,
     timeoutMs = KOBART_REQUEST_TIMEOUT_MS,
     onStateChange = () => {},
+    onTiming = () => {},
   } = {},
 ) {
   if (!Array.isArray(words) || words.length === 0) {
@@ -32,11 +33,27 @@ export function requestKoreanSentence(
   return new Promise((resolve, reject) => {
     let socket;
     let settled = false;
+    let startedAt = null;
+    let openedAt = null;
+    let sentAt = null;
+    let receivedAt = null;
 
     const finish = (error, result = null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutId);
+      const endedAt = performance.now();
+      const ms = value => value == null ? null : Math.round(value * 100) / 100;
+      const clientTiming = {
+        timingVersion: "browser-timing-v1",
+        sessionId, wordCount: requestWords.length,
+        status: error ? "error" : "success",
+        connectMs: ms(openedAt == null ? null : openedAt - startedAt),
+        sendToResponseMs: ms(receivedAt == null || sentAt == null ? null : receivedAt - sentAt),
+        requestResponseMs: ms(receivedAt == null ? null : receivedAt - startedAt),
+        elapsedMs: ms(startedAt == null ? null : endedAt - startedAt),
+        serverGenerationMs: null,
+      };
 
       if (socket) {
         socket.onopen = null;
@@ -48,8 +65,9 @@ export function requestKoreanSentence(
         }
       }
 
+      try { onTiming(clientTiming); } catch (logError) { console.warn("시간 로그 출력 실패", logError); }
       if (error) reject(error);
-      else resolve(result);
+      else resolve({ ...result, clientTiming });
     };
 
     const timeoutId = setTimeout(() => {
@@ -59,6 +77,7 @@ export function requestKoreanSentence(
     onStateChange("connecting", { sessionId, words: [...requestWords] });
 
     try {
+      startedAt = performance.now();
       socket = new WebSocket(url);
     } catch (error) {
       finish(new Error(`WebSocket 연결을 시작하지 못했습니다: ${error.message}`));
@@ -67,13 +86,16 @@ export function requestKoreanSentence(
 
     socket.onopen = () => {
       if (settled) return;
+      openedAt = performance.now();
       const payload = { session_id: sessionId, words: requestWords };
+      sentAt = performance.now();
       socket.send(JSON.stringify(payload));
       onStateChange("processing", payload);
     };
 
     socket.onmessage = (event) => {
       if (settled) return;
+      const messageReceivedAt = performance.now();
 
       let response;
       try {
@@ -99,6 +121,7 @@ export function requestKoreanSentence(
         return;
       }
 
+      receivedAt = messageReceivedAt;
       finish(null, {
         ...response,
         sentence: response.sentence.trim(),

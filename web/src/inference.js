@@ -1,3 +1,5 @@
+import { TIMING_VERSION, TimingSummary } from "./timing-metrics.js";
+
 const MODEL_VERSION = "word-lstm-v10-belly-seed44";
 const MODEL_URL = `/public/models/word-sign/model.json?v=${MODEL_VERSION}`;
 const CONFIG_URL = `/public/models/word-sign/config.json?v=${MODEL_VERSION}`;
@@ -14,6 +16,9 @@ export class WordSignInference {
     this.buffer = [];
     this.lastPredictionAt = 0;
     this.predictIntervalMs = 250;
+    this.timings = new TimingSummary(detail => this.log("단어 모델 추론 시간 요약", {
+      modelVersion: MODEL_VERSION, backend: window.tf.getBackend(), ...detail,
+    }), { warmupSamples: 3 });
   }
 
   async initialize() {
@@ -56,12 +61,21 @@ export class WordSignInference {
     // First inference compiles the selected browser backend.
     window.tf.tidy(() => {
       const warmup = window.tf.zeros([1, 60, 146], "float32");
-      this.model.predict(warmup);
+      this.model.predict(warmup).dataSync();
     });
     this.log("24클래스 모델 준비 완료", { inputShape, outputShape });
+    this.log("성능 측정 활성화", {
+      timingVersion: TIMING_VERSION, modelVersion: MODEL_VERSION,
+      tfjs: window.tf.version.tfjs, backend: window.tf.getBackend(),
+      userAgent: navigator.userAgent, summaryIntervalMs: 5000,
+      mediaPipeWarmupSamples: 5, inferenceWarmupSamples: 3,
+      note: "단위 ms. 모델 로딩·프레임 수집·IDLE 대기는 추론 시간에서 제외. 서버 자체 생성 시간은 별도 서버 로그 필요.",
+    });
   }
 
   reset() {
+    this.timings.flush();
+    this.timings.reset();
     this.buffer = [];
     this.lastPredictionAt = 0;
   }
@@ -88,6 +102,9 @@ export class WordSignInference {
     }
 
     this.lastPredictionAt = timestamp;
+    const startedAt = performance.now();
+    let modelStartedAt;
+    let modelFinishedAt;
     const probabilities = window.tf.tidy(() => {
       const flattened = new Float32Array(this.sequenceLength * this.featureCount);
       this.buffer.forEach((frame, index) => {
@@ -98,7 +115,15 @@ export class WordSignInference {
         [1, this.sequenceLength, this.featureCount],
         "float32",
       );
-      return Array.from(this.model.predict(input).dataSync());
+      modelStartedAt = performance.now();
+      const result = this.model.predict(input).dataSync();
+      modelFinishedAt = performance.now();
+      return Array.from(result);
+    });
+    this.timings.add({
+      inputPrepMs: modelStartedAt - startedAt,
+      modelMs: modelFinishedAt - modelStartedAt,
+      totalMs: performance.now() - startedAt,
     });
 
     const ranked = probabilities
