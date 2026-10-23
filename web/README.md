@@ -1,5 +1,9 @@
 # Capstone Web
 
+## 현재 설정 (2026-10-24 확인)
+
+시연용 소스입니다. 공개 주소: https://korean-fingerspelling-recognition-demo.pages.dev/ . 첫 45프레임을 60프레임으로 재표본화하는 조기 추론과 연속 단어 전환 4표 규칙이 있습니다. 첫 단어 조기 예측은 신뢰도 90% 이상이 2회 연속이면 확정될 수 있습니다. 상단 배너와 시연 모드 배지 삭제는 로컬 변경이며 아직 배포하지 않았습니다.
+
 브라우저 카메라와 온디바이스 수어 인식을 검증하기 위한 독립 웹 프로젝트입니다.
 기존 Python 학습 프로젝트와 데이터셋은 이 폴더에 복사하지 않습니다.
 
@@ -51,7 +55,7 @@ MediaPipe `.task`, WASM 파일을 올립니다. 사용자가 처음 접속하면
 Python 3가 설치된 환경에서 다음 명령을 실행합니다.
 
 ```bash
-cd /Users/heechan/visualcodeworkspace/korean-fingerspelling-recognition-deploy/web
+cd /Users/heechan/Documents/Codex/2026-09-02/files-mentioned-by-the-user-android/demo-ui-work/web
 python3 dev_server.py
 ```
 
@@ -85,7 +89,7 @@ Build output directory: .
 버전된 v10 가중치의 장기 캐시를 설정합니다. `model.json`, `config.json`,
 `labels.json`은 재배포 시 갱신되도록 캐시하지 않습니다.
 TensorFlow.js 4.22 번들이 런타임에 동적 함수를 생성하므로 `script-src`에는
-`'unsafe-eval'`이 포함됩니다. 외부 스크립트 출처는 허용하지 않고 `'self'`만 유지합니다.
+`'unsafe-eval'`이 포함됩니다. 스크립트는 같은 출처와 Cloudflare Insights에 한정하며, 연결 대상은 `_headers`의 CSP에서 확인합니다.
 
 `_headers`의 CSP `connect-src`에는
 `wss://sign-kobart.duckdns.org`만 KoBART 연결 대상으로 허용합니다.
@@ -119,3 +123,18 @@ capstone-web/
 실패한 요청은 같은 IDLE 구간에서 자동 반복하지 않고 새 수어 동작 후 다음 IDLE을
 기다립니다. VM이 꺼져 있거나 시작 직후라면 연결 실패할 수 있으므로 서버 모델
 로딩과 DNS 갱신이 끝난 뒤 다시 동작을 입력합니다.
+
+---
+
+## 개발 전용 테스트
+
+이 폴더의 HTML 파일은 로컬 모델·시퀀스·안정화 검증용입니다.
+Cloudflare Pages의 일반 사용자 링크로 안내하지 않습니다.
+
+- `/dev/model_test.html`
+- `/dev/sequence_test.html`
+- `/dev/recognition_test.html`
+
+연속 단어 누적·IDLE 종료·가변 길이 WebSocket payload 회귀 테스트는
+`node dev/recognition_sequence_test.mjs`로 실행합니다. 실제 수어 인식률 검증은
+카메라 또는 별도 녹화 데이터로 진행해야 합니다.

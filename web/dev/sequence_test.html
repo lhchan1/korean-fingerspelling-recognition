@@ -11,17 +11,28 @@
         const inference = new WordSignInference();
         await inference.initialize();
         let state;
+        let earlyPrediction = null;
         for (let index = 0; index < 60; index += 1) {
           state = await inference.addFrame(new Array(146).fill(0), index * 67);
+          if (index < 44 && state.prediction) throw new Error("45프레임 전에 추론했습니다.");
+          if (index === 44) earlyPrediction = state.prediction;
         }
-        if (!state?.prediction || state.top.length !== 3) {
-          throw new Error("60프레임 이후 예측 결과가 생성되지 않았습니다.");
+        if (!earlyPrediction?.early || !Number.isFinite(earlyPrediction.confidence)) {
+          throw new Error("45프레임 조기 추론 결과가 생성되지 않았습니다.");
         }
+        // Inference is throttled to 250ms; frame 60 need not emit a prediction.
+        // Advance the clock beyond the interval to check the full-window result.
+        state = await inference.addFrame(new Array(146).fill(0), 60 * 67 + 250);
+        if (state.size !== 60 || !state.prediction || state.prediction.early ||
+            !Number.isFinite(state.prediction.confidence)) {
+          throw new Error("60프레임 버퍼의 전체 구간 추론에 실패했습니다.");
+        }
+        inference.model.dispose();
         output.textContent = JSON.stringify({
           status: "PASS",
           bufferSize: state.size,
           prediction: state.prediction,
-          topCount: state.top.length,
+          earlyPrediction,
         });
       } catch (error) {
         output.textContent = JSON.stringify({ status: "FAIL", error: error.stack || error.message });

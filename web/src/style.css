@@ -29,27 +29,8 @@ h1, h2, p { margin-top: 0; }
   padding: 28px 0 50px;
 }
 
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 8px 2px 28px;
-}
 
-.brand-mark {
-  display: grid;
-  flex: 0 0 49px;
-  height: 49px;
-  place-items: center;
-  border: 1px solid rgba(178, 238, 211, 0.34);
-  border-radius: 15px;
-  color: #b5f3d4;
-  background: #132438;
-  font-size: 1.45rem;
-  font-weight: 750;
-}
 
-.header-copy { min-width: 0; }
 .eyebrow {
   margin: 0 0 7px;
   color: #9aeac6;
@@ -58,30 +39,8 @@ h1, h2, p { margin-top: 0; }
   letter-spacing: 0.12em;
 }
 
-.page-header h1 {
-  margin: 0;
-  font-size: clamp(1.35rem, 2.1vw, 1.9rem);
-  font-weight: 790;
-  letter-spacing: -0.04em;
-}
 
-.page-subtitle {
-  margin: 5px 0 0;
-  color: #9baabc;
-  font-size: 0.84rem;
-}
 
-.demo-badge {
-  flex: 0 0 auto;
-  margin-left: auto;
-  padding: 8px 11px;
-  border: 1px solid #2e4d55;
-  border-radius: 999px;
-  color: #b2efd3;
-  background: rgba(82, 173, 139, 0.1);
-  font-size: 0.72rem;
-  font-weight: 750;
-}
 
 .demo-grid {
   display: grid;
@@ -361,10 +320,6 @@ h1, h2, p { margin-top: 0; }
 }
 @media (max-width: 600px) {
   .app-shell { width: calc(100% - 20px); padding: 20px 0 36px; }
-  .page-header { gap: 11px; padding: 2px 2px 18px; }
-  .brand-mark { flex-basis: 42px; height: 42px; border-radius: 12px; }
-  .page-subtitle { font-size: 0.7rem; line-height: 1.4; }
-  .demo-badge { display: none; }
   .camera-card, .recognized-card { padding: 12px; border-radius: 17px; }
   .section-hint { display: none; }
   .camera-stage { aspect-ratio: 3 / 4; border-radius: 11px; }
