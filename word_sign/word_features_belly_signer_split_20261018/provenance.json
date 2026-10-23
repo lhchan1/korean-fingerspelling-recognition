@@ -1,0 +1,19 @@
+{
+  "source_S001_S003": "/Users/heechan/visualcodeworkspace/Capstone/fingerspelling_capture/word_sign/word_features_belly_20261018",
+  "source_S004_S005": "/Users/heechan/visualcodeworkspace/Capstone/fingerspelling_capture/word_sign/word_features_s004_s005_20261018",
+  "metadata_sha256": "12508e20df30df252270502718c2270770d9cecb8ba836cab7b1666af106965a",
+  "counts": {
+    "landmarks.csv": {
+      "S001-S003_rows": 74520,
+      "S004-S005_rows": 24120
+    },
+    "quality_report.csv": {
+      "S001-S003_rows": 1242,
+      "S004-S005_rows": 402
+    }
+  },
+  "output_sha256": {
+    "landmarks.csv": "9c8aff0c7d228b96b380b90fc18db6a8cdd969cf59bd3d0254debb2477906117",
+    "quality_report.csv": "c3f9d46163af2c6ef55c3a52d9a3494e5b658209b4c55612498d2886d214bc7d"
+  }
+}

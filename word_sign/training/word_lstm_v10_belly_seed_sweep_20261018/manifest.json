@@ -1,0 +1,71 @@
+{
+  "model_version": "v10",
+  "architecture": "v9 LSTM64 + GaussianNoise0.005 + Dropout0.3 + Dense32 + Dense24",
+  "input_shape": [
+    60,
+    146
+  ],
+  "feature_source": "/Users/heechan/visualcodeworkspace/Capstone/fingerspelling_capture/word_sign/word_features_belly_signer_split_20261018/landmarks.csv",
+  "features_sha256": "9c8aff0c7d228b96b380b90fc18db6a8cdd969cf59bd3d0254debb2477906117",
+  "quality_sha256": "c3f9d46163af2c6ef55c3a52d9a3494e5b658209b4c55612498d2886d214bc7d",
+  "signers_included": [
+    "S001",
+    "S002",
+    "S003",
+    "S004"
+  ],
+  "signers_excluded": [
+    "S005"
+  ],
+  "quality_exclusion": "quality_grade == exclude",
+  "usable_videos": 1574,
+  "test_source": "/Users/heechan/visualcodeworkspace/Capstone/fingerspelling_capture/word_sign/training/word_lstm_belly_split_ratios_20261018/80_10_10/split.csv",
+  "test_ids_sha256": "ac80e31bb3982cbb773e9a2261bbd15faf406bba7a76c652271fa4ad78dc0c9c",
+  "common_test_videos": 157,
+  "val_per_label": {
+    "IDLE": 5,
+    "OTHER": 9,
+    "나": 6,
+    "머리": 6,
+    "배": 7,
+    "목": 6,
+    "아프다": 6,
+    "어지럽다": 6,
+    "기침": 6,
+    "있다": 6,
+    "가래": 6,
+    "메스껍다": 6,
+    "지금": 7,
+    "어제": 6,
+    "심하다": 7,
+    "가슴": 6,
+    "열": 7,
+    "허리": 5,
+    "약": 6,
+    "콧물": 6,
+    "설사": 13,
+    "없다": 6,
+    "구토": 7,
+    "조금": 6
+  },
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "training": {
+    "optimizer": "Adam",
+    "learning_rate": 0.001,
+    "batch_size": 8,
+    "epochs_max": 180,
+    "early_stopping_patience": 20,
+    "reduce_lr_factor": 0.5,
+    "reduce_lr_patience": 5,
+    "min_lr": 1e-05,
+    "class_weights": true,
+    "seed_applies_to": "train/val selection, model initialization, fit shuffle"
+  },
+  "note": "Test IDs remain fixed across seeds. This supports paired exploratory comparison, not an unbiased final accuracy after choosing the best test result."
+}

@@ -1,0 +1,22 @@
+{
+  "version": "v10",
+  "seed": 46,
+  "parameters": 56888,
+  "train_count": 1260,
+  "val_count": 157,
+  "test_count": 157,
+  "epochs_trained": 46,
+  "best_epoch": 26,
+  "train_accuracy_at_best_epoch": 0.9007936716079712,
+  "train_loss_at_best_epoch": 0.29379546642303467,
+  "val_accuracy": 0.8980891704559326,
+  "val_loss": 0.33313310146331787,
+  "test_accuracy": 0.8598726391792297,
+  "test_loss": 0.5249326229095459,
+  "val_correct": 141,
+  "test_correct": 135,
+  "macro_f1": 0.8639284326784327,
+  "belly_test_correct": 6,
+  "belly_test_count": 7,
+  "seconds": 65.9
+}

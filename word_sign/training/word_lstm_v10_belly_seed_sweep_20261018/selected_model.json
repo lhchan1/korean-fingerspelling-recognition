@@ -1,0 +1,17 @@
+{
+  "version": "v10",
+  "status": "selected_exploratory_candidate_not_deployed",
+  "selected_seed": 44,
+  "selection_rule": "highest accuracy on the fixed 157-video common test; lower test loss breaks ties",
+  "model_path": "seed_44/best.keras",
+  "model_sha256": "0501288f18a04c4041d957e433c384e503238a3f3f8da764ee7d2859ec6ed875",
+  "labels_path": "labels.json",
+  "config_path": "seed_44/config.json",
+  "input_shape": [60, 146],
+  "output_classes": 24,
+  "test_correct": 147,
+  "test_count": 157,
+  "test_accuracy": 0.9363057613372803,
+  "test_loss": 0.17235007882118225,
+  "warning": "This candidate was selected after comparing five results on the same test set. Its test score is selection-biased and needs new external signer/device validation before deployment. The .keras file is not a TF.js model.json/weights binary."
+}

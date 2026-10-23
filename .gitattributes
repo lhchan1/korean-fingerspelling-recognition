@@ -1,0 +1,2 @@
+word_sign/word_features_belly_signer_split_20261018/landmarks.csv filter=lfs diff=lfs merge=lfs -text
+word_sign/word_features_120f_seed44_complete/landmarks.csv filter=lfs diff=lfs merge=lfs -text

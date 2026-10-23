@@ -1,0 +1,48 @@
+{
+  "version": "v10",
+  "seed": 43,
+  "input_shape": [
+    60,
+    146
+  ],
+  "labels": [
+    "IDLE",
+    "OTHER",
+    "나",
+    "머리",
+    "배",
+    "목",
+    "아프다",
+    "어지럽다",
+    "기침",
+    "있다",
+    "가래",
+    "메스껍다",
+    "지금",
+    "어제",
+    "심하다",
+    "가슴",
+    "열",
+    "허리",
+    "약",
+    "콧물",
+    "설사",
+    "없다",
+    "구토",
+    "조금"
+  ],
+  "parameters": 56888,
+  "split_sizes": {
+    "train": 1260,
+    "val": 157,
+    "test": 157
+  },
+  "architecture": "GaussianNoise0.005 -> LSTM64 -> Dropout0.3 -> Dense32 ReLU -> Dense24 Softmax",
+  "training": {
+    "learning_rate": 0.001,
+    "batch_size": 8,
+    "epochs_max": 180,
+    "early_stopping_patience": 20,
+    "reduce_lr_patience": 5
+  }
+}
